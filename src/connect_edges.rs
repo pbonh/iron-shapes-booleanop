@@ -4,12 +4,7 @@ use super::Operation;
 use std::rc::Rc;
 use std::fmt::Debug;
 use iron_shapes::polygon::Polygon;
-use iron_shapes::simple_polygon::SimplePolygon;
-use iron_shapes::traits::WindingNumber;
 use iron_shapes::point::Point;
-use iron_shapes::edge::Edge;
-
-use std::cmp::Ordering;
 
 #[derive(Debug, Clone, PartialEq)]
 struct Event<T: CoordinateType> {

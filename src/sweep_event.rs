@@ -1,7 +1,6 @@
 use std::cell::RefCell;
 use std::rc::{Rc, Weak};
 use iron_shapes::point::Point;
-use iron_shapes::polygon::Polygon;
 use iron_shapes::edge::{Edge, Side};
 use iron_shapes::CoordinateType;
 

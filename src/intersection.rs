@@ -15,7 +15,6 @@ use super::compare_segments::compare_events_by_segments;
 use super::connect_edges::connect_edges;
 use super::possible_intersection::possible_intersection;
 use std::fmt::Debug;
-use iron_shapes::traits::WindingNumber;
 use std::ops::RangeFrom;
 use std::cmp::Ordering;
 use itertools::Itertools;
@@ -130,6 +129,16 @@ pub fn compute_fields<T>(event: &Rc<SweepEvent<T>>,
 /// Perform boolean operation on multiple subject and clipping polygons.
 /// # Parameters
 /// `edge_intersection`: Function to compute the intersection of two edges.
+/// `operations`: The boolean operations to be computed.
+///
+/// # Example
+///
+/// ```
+/// use iron_shapes_booleanop::boolean_multi_op;
+/// use iron_shapes::prelude::Polygon;
+///
+///
+/// ```
 pub fn boolean_multi_op<I, F>(edge_intersection: I,
                               subject: &[&Polygon<F>],
                               clipping: &[&Polygon<F>],
@@ -159,7 +168,7 @@ pub fn boolean_multi_op<I, F>(edge_intersection: I,
     results
 }
 
-
+/// Perform boolean operation.
 pub fn boolean_op<I, F>(edge_intersection: I,
                         subject: &[&Polygon<F>],
                         clipping: &[&Polygon<F>],
@@ -173,17 +182,17 @@ pub fn boolean_op<I, F>(edge_intersection: I,
     result.remove(0)
 }
 
-fn edge_intersection_float<F: Float>(e1: &Edge<F>, e2: &Edge<F>) -> EdgeIntersection<F, F> {
+pub fn edge_intersection_float<F: Float>(e1: &Edge<F>, e2: &Edge<F>) -> EdgeIntersection<F, F> {
     e1.edge_intersection_approx(e2, F::from(1e-8).unwrap())
 }
 
 
-fn edge_intersection_rational(e1: &Edge<Rational>, e2: &Edge<Rational>) -> EdgeIntersection<Rational, Rational> {
+pub fn edge_intersection_rational(e1: &Edge<Rational>, e2: &Edge<Rational>) -> EdgeIntersection<Rational, Rational> {
     e1.edge_intersection_rational(e2)
 }
 
 
-fn edge_intersection_integer<T: PrimInt + Debug>(e1: &Edge<T>, e2: &Edge<T>) -> EdgeIntersection<T, T> {
+pub fn edge_intersection_integer<T: PrimInt + Debug>(e1: &Edge<T>, e2: &Edge<T>) -> EdgeIntersection<T, T> {
     e1.edge_intersection_rounded(e2)
 }
 
@@ -423,15 +432,13 @@ fn merge_edges<T: CoordinateType + Debug>(edge: Edge<T>, events: Vec<&Rc<SweepEv
 mod test {
     extern crate rand;
 
-    use super::*;
-    use iron_shapes::point::Point;
+    use crate::*;
+    use iron_shapes::prelude::*;
+    use iron_shapes::traits::{Translate, Scale};
     use num_rational::Rational;
-    use num_traits::Zero;
-    use iron_shapes::traits::{Translate, Scale, DoubledOrientedArea};
     use self::rand::distributions::{Uniform, Distribution};
     use self::rand::rngs::StdRng;
     use self::rand::SeedableRng;
-    use iron_shapes::edge_rational;
 
     #[test]
     fn test_degenerate_polygons() {
