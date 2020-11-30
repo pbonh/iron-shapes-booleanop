@@ -7,7 +7,7 @@ use num_rational::Rational;
 use iron_shapes::multi_polygon::MultiPolygon;
 
 use iron_shapes::CoordinateType;
-use crate::splay::SplaySet;
+use libreda_splay::SplaySet;
 use super::sweep_event::*;
 use super::Operation;
 use num_traits::{Float, PrimInt};

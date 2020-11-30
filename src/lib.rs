@@ -5,5 +5,4 @@ extern crate itertools;
 
 extern crate iron_shapes;
 
-mod splay;
 pub mod boolean;
