@@ -65,7 +65,8 @@ fn fill_queue<T: CoordinateType>(subject: &[&Polygon<T>],
                 event_queue.push(event_b);
             }
         }
-    };
+    }
+    ;
 
     let mut contour_id = 0;
 
@@ -132,12 +133,19 @@ pub fn compute_fields<T>(event: &Rc<SweepEvent<T>>,
 /// `operations`: The boolean operations to be computed.
 ///
 /// # Example
-///
 /// ```
-/// use iron_shapes_booleanop::boolean_multi_op;
-/// use iron_shapes::prelude::Polygon;
+/// use iron_shapes_booleanop::*;
+/// use iron_shapes::prelude::*;
+/// let p1 = Polygon::from(vec![(0., 0.), (2., 0.), (2., 2.), (0., 2.)]);
+/// let p2 = p1.translate((1., 1.).into());
+/// let expected_union = Polygon::from(vec![(0., 0.), (2., 0.), (2., 1.), (3., 1.),
+///                                                 (3., 3.), (1., 3.), (1., 2.), (0., 2.)]);
 ///
+/// let result = boolean_multi_op(edge_intersection_float, &[&p1], &[&p2],
+///     &[Operation::Union]);
 ///
+/// assert_eq!(result[0].len(), 1);
+/// assert_eq!(result[0].polygons[0], expected_union);
 /// ```
 pub fn boolean_multi_op<I, F>(edge_intersection: I,
                               subject: &[&Polygon<F>],
@@ -169,6 +177,21 @@ pub fn boolean_multi_op<I, F>(edge_intersection: I,
 }
 
 /// Perform boolean operation.
+///
+/// # Example
+/// ```
+/// use iron_shapes_booleanop::*;
+/// use iron_shapes::prelude::*;
+/// let p1 = Polygon::from(vec![(0., 0.), (2., 0.), (2., 2.), (0., 2.)]);
+/// let p2 = p1.translate((1., 1.).into());
+/// let expected_union = Polygon::from(vec![(0., 0.), (2., 0.), (2., 1.), (3., 1.),
+///                                                 (3., 3.), (1., 3.), (1., 2.), (0., 2.)]);
+///
+/// let i = boolean_op(edge_intersection_float, &[&p1], &[&p2], Operation::Union);
+///
+/// assert_eq!(i.len(), 1);
+/// assert_eq!(i.polygons[0], expected_union);
+/// ```
 pub fn boolean_op<I, F>(edge_intersection: I,
                         subject: &[&Polygon<F>],
                         clipping: &[&Polygon<F>],
