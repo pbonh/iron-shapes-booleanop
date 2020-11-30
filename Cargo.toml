@@ -1,0 +1,16 @@
+[package]
+name = "iron-shapes-booleanop"
+version = "0.0.0"
+authors = ["Thomas Kramer <code@tkramer.ch>"]
+edition = "2018"
+license = "AGPLv3"
+description = "Boolean operations on polygons for iron-shapes."
+
+[dependencies]
+num-traits = "0.2"
+num-rational = "0.2"
+itertools = "0.8.0"
+iron-shapes = {path = "../iron-shapes"}
+
+[dev-dependencies]
+rand = "0.7"
