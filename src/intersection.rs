@@ -789,7 +789,7 @@ mod test {
 
         // Some random translation
 //        let t = Point::new(Rational::new(100, 7), Rational::new(5, 23));
-        let t = Point::new(Rational::new(0, 1), Rational::new(0, 1));
+        let t = Vector::new(Rational::new(0, 1), Rational::new(0, 1));
 
         let a = Polygon::from(vec![p(0, 0), p(11, 11), p(4, 8)]).translate(t);
         let b = Polygon::from(vec![p(4, 4), p(11, 11), p(1, 10)]).translate(t);
