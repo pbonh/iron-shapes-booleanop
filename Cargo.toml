@@ -9,7 +9,7 @@ description = "Boolean operations on polygons for iron-shapes."
 [dependencies]
 num-traits = "0.2"
 num-rational = "0.2"
-itertools = "0.8.0"
+itertools = "0.10"
 iron-shapes = {path = "../iron-shapes"}
 libreda-splay = {path = "../splay"}
 
