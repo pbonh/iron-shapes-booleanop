@@ -309,7 +309,7 @@ fn subdivide_segments<T: CoordinateType + Debug, I>(
 
         if event.is_left_event() {
             debug_assert!(!scan_line.contains(&event), "Event is already in the scan line.");
-            println!("insert {:?}", event.get_edge_id());
+            // println!("insert {:?}", event.get_edge_id());
 
             scan_line.insert(event.clone());
 
