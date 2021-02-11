@@ -30,10 +30,14 @@ use iron_shapes::point::Point;
 
 #[derive(Debug, Clone, PartialEq)]
 struct Event<T: CoordinateType> {
+    /// Index of this event in the vector where it is stored.
     index: usize,
+    /// Index of the other event of this pair.
     other_index: usize,
+    /// The endpoint of the edge which is represented by this event.
     p: Point<T>,
     is_hull: bool,
+    /// Tells if this is the left or right event of the segment.
     is_left_event: bool,
     polygon_type: PolygonType,
     contour_id: usize,
@@ -123,6 +127,7 @@ fn order_events<T>(events: &mut Vec<Rc<SweepEvent<T>>>) -> Vec<Event<T>>
 {
 
     // Sort the events.
+    // The events are probably almost sorted.
     let mut sorted = false;
     while !sorted {
         sorted = true;
@@ -144,6 +149,8 @@ fn order_events<T>(events: &mut Vec<Rc<SweepEvent<T>>>) -> Vec<Event<T>>
 
     // Sorted by coordinates implies that end-point and start-point of two connected edges are close together in the list.
     // Further, the start-point of the second edge will come after the end-point of the first edge.
+
+    // Tell the events what index they have.
     for (pos, event) in events.iter().enumerate() {
         event.set_pos(pos)
     }
@@ -219,6 +226,10 @@ fn next_index<T: CoordinateType>(events: &[Event<T>],
 }
 
 /// Given the processed and sorted events, connect the edges to polygons.
+///
+/// This uses the property events at the same point lie next to each other in the list
+/// of sorted events. This way it is easy to follow the contour: 1) Start at some left event,
+/// 2) go to its right event, 3) from there find a event with the same location.
 pub fn connect_edges<T>(sorted_events: &[Rc<SweepEvent<T>>], operation: Operation) -> Vec<Polygon<T>>
     where
         T: CoordinateType + Debug,
@@ -229,24 +240,29 @@ pub fn connect_edges<T>(sorted_events: &[Rc<SweepEvent<T>>], operation: Operatio
 
     debug_assert!(events.len() % 2 == 0, "Expect an even number of events.");
 
+    // Store found contours.
     let mut polygons: Vec<Polygon<T>> = Vec::new();
+
+    // Remember which events have been processed.
     let mut processed: Vec<bool> = vec![false; events.len()];
 
     for i in 0..events.len() {
+        // Find the next unprocessed event from the left.
         if processed[i] {
             continue;
         }
 
-        // Sanity check.
+        // Sanity check: There must be an even number of unprocessed events,
+        // because events always come in pairs.
         debug_assert!(
             processed
                 .iter()
                 .filter(|&&b| !b)
                 .count() % 2 == 0,
-            "Expect to have an even number of non-processed events." // Because events always come in couples.
+            "Expect to have an even number of non-processed events."
         );
 
-        // Sanity check.
+        // Sanity check: There must be as many right events as left events among the unprocessed events.
         debug_assert!(
             (0..events.len())
                 .into_iter()
