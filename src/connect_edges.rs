@@ -237,14 +237,16 @@ pub fn connect_edges<T>(sorted_events: &[Rc<SweepEvent<T>>], operation: Operatio
             continue;
         }
 
+        // Sanity check.
         debug_assert!(
             processed
                 .iter()
-                .map(|&b| if b { 0 } else { 1 })
-                .fold(0, |a, b| a + b) % 2 == 0,
-            "Expect to have an even number of non-processed events."
+                .filter(|&&b| !b)
+                .count() % 2 == 0,
+            "Expect to have an even number of non-processed events." // Because events always come in couples.
         );
 
+        // Sanity check.
         debug_assert!(
             (0..events.len())
                 .into_iter()
