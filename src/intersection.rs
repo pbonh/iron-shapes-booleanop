@@ -205,16 +205,20 @@ pub fn boolean_op<I, F>(edge_intersection: I,
     result.remove(0)
 }
 
+/// Compute approximate intersection point of two edges in floating point coordinates.
 pub fn edge_intersection_float<F: Float>(e1: &Edge<F>, e2: &Edge<F>) -> EdgeIntersection<F, F> {
     e1.edge_intersection_approx(e2, F::from(1e-8).unwrap())
 }
 
-
+/// Compute the intersection of edges with rational coordinates.
+/// In rational coordinates intersections can be computed exactly.
 pub fn edge_intersection_rational(e1: &Edge<Rational>, e2: &Edge<Rational>) -> EdgeIntersection<Rational, Rational> {
     e1.edge_intersection_rational(e2)
 }
 
-
+/// Compute intersection of edges in integer coordinates.
+/// For edges that are parallel to the x or y axis the intersection can be computed exactly.
+/// For others it will be rounded.
 pub fn edge_intersection_integer<T: PrimInt + Debug>(e1: &Edge<T>, e2: &Edge<T>) -> EdgeIntersection<T, T> {
     e1.edge_intersection_rounded(e2)
 }

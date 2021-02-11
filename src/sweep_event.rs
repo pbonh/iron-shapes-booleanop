@@ -52,6 +52,7 @@ struct MutablePart<T: CoordinateType> {
 
 #[derive(Debug, Clone)]
 pub struct SweepEvent<T: CoordinateType> {
+    /// Mutable part of the sweep event. Borrow checking happens at runtime.
     mutable: RefCell<MutablePart<T>>,
     /// Point associated with the event.
     pub p: Point<T>,
