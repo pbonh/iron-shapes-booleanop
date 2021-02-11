@@ -44,12 +44,18 @@ impl PolygonType {
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum EdgeType {
     Normal,
+    /// No contribution to the result.
     NonContributing,
+    /// The edge represents two collinear edges of different polygons. Both have
+    /// the 'inside' of the polygon on the *same* side.
     SameTransition,
+    /// The edge represents two collinear edges of different polygons. They have
+    /// the 'inside' of the polygon on *different* sides.
     DifferentTransition,
 }
 
 
+/// Mutable data of a sweep event.
 #[derive(Debug, Clone)]
 struct MutablePart<T: CoordinateType> {
     /// Reference to the event associated with the other endpoint of the edge.
@@ -73,7 +79,7 @@ struct MutablePart<T: CoordinateType> {
 pub struct SweepEvent<T: CoordinateType> {
     /// Mutable part of the sweep event. Borrow checking happens at runtime.
     mutable: RefCell<MutablePart<T>>,
-    /// Point associated with the event.
+    /// Point associated with the event. Starting point or end point of the edge.
     pub p: Point<T>,
     pub contour_id: usize,
     /// Type of polygon: either SUBJECT or CLIPPING.
@@ -83,6 +89,7 @@ pub struct SweepEvent<T: CoordinateType> {
 
 
 impl<T: CoordinateType> SweepEvent<T> {
+    /// Create a new sweep event wrapped into a `Rc`.
     pub fn new_rc(
         contour_id: usize,
         edge_id: usize,
@@ -119,10 +126,12 @@ impl<T: CoordinateType> SweepEvent<T> {
         self.mutable.borrow_mut().is_left_event = left
     }
 
+    /// Get the event that represents the other end point of this segment.
     pub fn get_other_event(&self) -> Option<Rc<SweepEvent<T>>> {
         self.mutable.borrow().other_event.upgrade()
     }
 
+    /// Set the event that represents the other end point of this segment.
     pub fn set_other_event(&self, other_event: &Rc<SweepEvent<T>>) {
         debug_assert_ne!(self.is_left_event(), other_event.is_left_event());
         self.mutable.borrow_mut().other_event = Rc::downgrade(other_event);

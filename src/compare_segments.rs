@@ -18,6 +18,9 @@
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
 
+//! Compute the ordering among edges. This is used to keep sweep events in the right ordering
+//! in the scan line.
+
 use std::rc::{Rc, Weak};
 use iron_shapes::edge::{Edge, Side};
 use std::cmp::Ordering;
@@ -54,6 +57,16 @@ fn compare_edges<T: CoordinateType>(first: &Edge<T>, second: &Edge<T>) -> Orderi
     }
 }
 
+/// Compute the ordering of two sweep events. This is used to keep the sweep events
+/// sorted in the scan line.
+///
+/// The two sweep events MUST be left events. Otherwise the function panics in debug mode.
+///
+/// Also the two edges defined by the sweep events must overlap when projected on the x-axis.
+/// (Otherwise they would not both intersect with the scan line.)
+///
+/// When used correctly the sweep events are sorted by the ascending y-coordinate of their
+/// intersection point with the scan line.
 pub fn compare_events_by_segments<T>(le1: &Rc<SweepEvent<T>>,
                                      le2: &Rc<SweepEvent<T>>) -> Ordering
     where

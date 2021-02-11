@@ -17,6 +17,9 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
+
+//! Connect the resulting edges of the sweep line algorithm into polygons.
+
 use iron_shapes::CoordinateType;
 use super::sweep_event::{SweepEvent, PolygonType, EdgeType};
 use super::Operation;
