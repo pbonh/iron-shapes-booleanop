@@ -180,6 +180,8 @@ impl<T: CoordinateType> SweepEvent<T> {
         self.mutable.borrow().upper_boundary
     }
 
+
+    /// Is this event outside of the other polygon?
     pub fn is_outside_other(&self) -> bool {
         self.mutable.borrow().is_outside_other
     }

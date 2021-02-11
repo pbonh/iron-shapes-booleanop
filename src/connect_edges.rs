@@ -109,8 +109,8 @@ fn filter_events<T>(sorted_events: &[Rc<SweepEvent<T>>], operation: Operation) -
             if event.is_left_event() {
                 contributes_to_result(event, operation)
             } else {
-                event.get_other_event().map(|o|
-                    contributes_to_result(o.as_ref(), operation))
+                event.get_other_event().map(|other|
+                    contributes_to_result(other.as_ref(), operation))
                     .unwrap_or(false)
             }
         )

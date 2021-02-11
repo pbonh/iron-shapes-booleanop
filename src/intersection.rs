@@ -112,7 +112,7 @@ fn fill_queue<T: CoordinateType>(subject: &[&Polygon<T>],
 }
 
 
-/// Compute flags and fields for a segment based on its predecessor in the scan line.
+/// Compute flags and fields for a segment based on its predecessor in the scan line (if there is one).
 pub fn compute_fields<T>(event: &Rc<SweepEvent<T>>,
                          maybe_prev: Option<&Rc<SweepEvent<T>>>)
     where
@@ -135,6 +135,9 @@ pub fn compute_fields<T>(event: &Rc<SweepEvent<T>>,
         };
 
         event.set_upper_boundary(upper_boundary, is_outside_other);
+
+        // TODO: Remember the previous segment for contour-hole attribution.
+
     } else {
         // This is the first event in the scan line.
         if event.is_vertical() {
@@ -302,11 +305,7 @@ fn subdivide_segments<T: CoordinateType + Debug, I>(
         );
 
         // Insert event at found position.
-        if pos > sorted_events.len() {
-            sorted_events.push(event.clone());
-        } else {
-            sorted_events.insert(pos, event.clone());
-        }
+        sorted_events.insert(pos, event.clone());
 
         if event.is_left_event() {
             debug_assert!(!scan_line.contains(&event), "Event is already in the scan line.");
@@ -390,6 +389,8 @@ fn subdivide_segments<T: CoordinateType + Debug, I>(
 
 /// Merge a group of equal edges into a single edge.
 /// Expects to get only left events.
+///
+/// TODO: Can this be done incrementally in `compute_fields`?
 ///
 /// # Parameters
 /// `edge`: An `Edge`.
