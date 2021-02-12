@@ -100,8 +100,15 @@ pub fn compare_events_by_segments<T>(le1: &Rc<SweepEvent<T>>,
 //       TODO: if edge1.is_collinear_approx(edge2, tolerance) {
     if edge1.is_collinear(&edge2) {
         // Segments are collinear, thus they intersect the scan line in the same point.
-        // Break the tie by the edge_id.
-        le1.get_edge_id().cmp(&le2.get_edge_id())
+        // Break the tie by the polygon type and then the edge_id.
+
+        // Ordering by the polygon type is needed for resolving multiple overlapping edges.
+        let by_polygon_type = match (le1.polygon_type, le2.polygon_type) {
+            (PolygonType::Subject, PolygonType::Clipping) => Ordering::Less,
+            (PolygonType::Clipping, PolygonType::Subject) => Ordering::Greater,
+            (_, _) => Ordering::Equal,
+        };
+        by_polygon_type.then_with(|| le1.get_edge_id().cmp(&le2.get_edge_id()))
     } else {
         // Segments are not collinear.
 

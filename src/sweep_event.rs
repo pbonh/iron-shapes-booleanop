@@ -54,6 +54,16 @@ pub enum EdgeType {
     DifferentTransition,
 }
 
+/// Tell what kind of boundary this edge forms in the result.
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+pub enum ResultBoundaryType {
+    /// Edge is no boundary of the result. Does not contribute to the result.
+    None,
+    /// Edge is a lower boundary of the result.
+    Lower,
+    /// Edge is an upper boundary of the result.
+    Upper
+}
 
 /// Mutable data of a sweep event.
 #[derive(Debug, Clone)]
@@ -61,7 +71,7 @@ struct MutablePart<T: CoordinateType> {
     /// Reference to the event associated with the other endpoint of the edge.
     other_event: Weak<SweepEvent<T>>,
     /// Edge below this event. This is used to find polygon-hole relationships.
-    prev_in_result: Weak<SweepEvent<T>>,
+    prev: Weak<SweepEvent<T>>,
     /// Is p the left endpoint of the edge (p, other.p)?
     is_left_event: bool,
     /// Is this an upper boundary of this polygon?
@@ -103,7 +113,7 @@ impl<T: CoordinateType> SweepEvent<T> {
         Rc::new(SweepEvent {
             mutable: RefCell::new(MutablePart {
                 other_event,
-                prev_in_result: Weak::new(),
+                prev: Weak::new(),
                 is_left_event,
                 upper_boundary: false,
                 edge_type,
@@ -219,8 +229,12 @@ impl<T: CoordinateType> SweepEvent<T> {
         }
     }
 
-    pub fn get_prev_in_result(&self) -> Weak<SweepEvent<T>> {
-        self.mutable.borrow().prev_in_result.clone()
+    pub fn get_prev(&self) -> Weak<SweepEvent<T>> {
+        self.mutable.borrow().prev.clone()
+    }
+
+    pub fn set_prev(&self, prev: Weak<SweepEvent<T>>) {
+        self.mutable.borrow_mut().prev = prev;
     }
 }
 
@@ -282,8 +296,15 @@ impl<'a, T> Ord for SweepEvent<T>
                             }
                             Side::Center => {
                                 debug_assert!(edge1.is_collinear(&edge2));
-                                // Break tie with edge_id.
-                                other.get_edge_id().cmp(&self.get_edge_id())
+                                // Break the tie by the polygon type and then the edge_id.
+                                // other.get_edge_id().cmp(&self.get_edge_id())
+                                // Ordering by the polygon type is needed for resolving multiple overlapping edges.
+                                let by_polygon_type = match (other.polygon_type, self.polygon_type) {
+                                    (PolygonType::Subject, PolygonType::Clipping) => Ordering::Less,
+                                    (PolygonType::Clipping, PolygonType::Subject) => Ordering::Greater,
+                                    (_, _) => Ordering::Equal,
+                                };
+                                by_polygon_type.then_with(|| other.get_edge_id().cmp(&self.get_edge_id()))
                             }
                         }
                     }

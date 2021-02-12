@@ -27,6 +27,7 @@ use std::rc::Rc;
 use std::fmt::Debug;
 use iron_shapes::polygon::Polygon;
 use iron_shapes::point::Point;
+use iron_shapes::simple_polygon::SimplePolygon;
 
 #[derive(Debug, Clone, PartialEq)]
 struct Event<T: CoordinateType> {
@@ -34,6 +35,8 @@ struct Event<T: CoordinateType> {
     index: usize,
     /// Index of the other event of this pair.
     other_index: usize,
+    /// The index of the segment just below.
+    prev_index: Option<usize>,
     /// The endpoint of the edge which is represented by this event.
     p: Point<T>,
     is_hull: bool,
@@ -99,21 +102,50 @@ fn contributes_to_result<T>(event: &SweepEvent<T>, operation: Operation) -> bool
 
 /// Take all the events that contribute to the result.
 /// This depends on the boolean operation to be performed.
+/// Also adjusts the `prev` pointers for hole attribution.
 fn filter_events<T>(sorted_events: &[Rc<SweepEvent<T>>], operation: Operation) -> Vec<Rc<SweepEvent<T>>>
     where
         T: CoordinateType + Debug,
 {
+    // Flags that tell whether the event contributes to the result or not.
+    let mut contributes = vec![false; sorted_events.len()];
+
+    for (i, event) in sorted_events.iter().enumerate() {
+        event.set_pos(i);
+
+        let contributes_to_result = if event.is_left_event() {
+            contributes_to_result(event, operation)
+        } else {
+            event.get_other_event().map(|other|
+                contributes_to_result(other.as_ref(), operation))
+                .unwrap_or(false)
+        };
+
+        contributes[i] = contributes_to_result;
+
+        // Update the prev field for hole attrubution.
+        if let Some(prev) = event.get_prev().upgrade() {
+            if !contributes[prev.get_pos()] {
+                // The previous event is not contributing to the result, so take the previous
+                // of the previous.
+                event.set_prev(prev.get_prev());
+                debug_assert!({
+                    // If the `prev` is set now, it must be a contributing edge.
+                    if let Some(prevprev) = event.get_prev().upgrade() {
+                        contributes[prevprev.get_pos()]
+                    } else {
+                        true
+                    }
+                });
+            }
+        }
+    }
+
     // Filter relevant events.
     let result_events: Vec<_> = sorted_events.iter()
-        .filter(|event|
-            if event.is_left_event() {
-                contributes_to_result(event, operation)
-            } else {
-                event.get_other_event().map(|other|
-                    contributes_to_result(other.as_ref(), operation))
-                    .unwrap_or(false)
-            }
-        )
+        .zip(contributes)
+        .filter(|(_e, contributes)| *contributes)
+        .map(|(e, _)| e)
         .cloned()
         .collect();
     result_events
@@ -173,9 +205,11 @@ fn order_events<T>(events: &mut Vec<Rc<SweepEvent<T>>>) -> Vec<Event<T>>
             Event {
                 index,
                 other_index: event.get_pos(),
+                prev_index: event.get_prev().upgrade()
+                    .map(|p| p.get_pos()),
                 p: event.p,
                 is_left_event: event.is_left_event(),
-                is_hull: event.is_hull,
+                is_hull: event.is_outside_other(),
                 polygon_type: event.polygon_type,
                 contour_id: event.contour_id,
             }
@@ -236,7 +270,7 @@ pub fn connect_edges<T>(sorted_events: &[Rc<SweepEvent<T>>], operation: Operatio
 {
     let mut relevant_events = filter_events(sorted_events, operation);
 
-    let events = order_events(&mut relevant_events);
+    let mut events = order_events(&mut relevant_events);
 
     debug_assert!(events.len() % 2 == 0, "Expect an even number of events.");
 
@@ -282,13 +316,27 @@ pub fn connect_edges<T>(sorted_events: &[Rc<SweepEvent<T>>], operation: Operatio
 
         let mut pointer = i;
         let initial_event = &events[i];
+
+        // Find contour index if this is a hole.
+        let polygon_id = if initial_event.is_hull {
+            polygons.len()
+        } else {
+            initial_event.prev_index
+                .map(|prev| events[prev].contour_id)
+                // If there is no previous segment, this is a contour and not a hole.
+                // Create a new polygon id.
+                .unwrap_or(polygons.len())
+        };
+
         let initial_point = initial_event.p;
         debug_assert!(initial_event.is_left_event, "Initial event is expected to be a left event.");
 
         // Follow the lines until the contour is closed.
         loop {
+            events[pointer].contour_id = polygon_id;
+            let other_pointer = events[pointer].other_index;
+            events[other_pointer].contour_id = polygon_id;
             let event = &events[pointer];
-            let other_pointer = event.other_index;
             let other_event = &events[other_pointer];
 
             contour.push(event.p);
@@ -311,7 +359,13 @@ pub fn connect_edges<T>(sorted_events: &[Rc<SweepEvent<T>>], operation: Operatio
                 break;
             }
         }
-        polygons.push(Polygon::new(contour));
+        if polygon_id < polygons.len() {
+            // Add hole to existing polygon.
+            polygons[polygon_id].interiors.push(SimplePolygon::new(contour));
+            println!("Insert hole.");
+        } else {
+            polygons.push(Polygon::new(contour));
+        }
 //
 //        let index = polygons.iter().enumerate()
 //            .find(|(_pos, poly)|

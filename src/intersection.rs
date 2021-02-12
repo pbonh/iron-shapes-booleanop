@@ -136,8 +136,10 @@ pub fn compute_fields<T>(event: &Rc<SweepEvent<T>>,
 
         event.set_upper_boundary(upper_boundary, is_outside_other);
 
-        // TODO: Remember the previous segment for contour-hole attribution.
-
+        // Remember the previous segment for contour-hole attribution.
+        // Note: What matters in the end is the previous segment that also contributes to the result
+        // Hence there is post-processing necessary.
+        event.set_prev(Rc::downgrade(prev));
     } else {
         // This is the first event in the scan line.
         if event.is_vertical() {
@@ -147,55 +149,6 @@ pub fn compute_fields<T>(event: &Rc<SweepEvent<T>>,
             event.set_upper_boundary(false, true);
         }
     }
-}
-
-/// Perform boolean operation on multiple subject and clipping polygons.
-/// # Parameters
-/// `edge_intersection`: Function to compute the intersection of two edges.
-/// `operations`: The boolean operations to be computed.
-///
-/// # Example
-/// ```
-/// use iron_shapes_booleanop::*;
-/// use iron_shapes::prelude::*;
-/// let p1 = Polygon::from(vec![(0., 0.), (2., 0.), (2., 2.), (0., 2.)]);
-/// let p2 = p1.translate((1., 1.).into());
-/// let expected_union = Polygon::from(vec![(0., 0.), (2., 0.), (2., 1.), (3., 1.),
-///                                                 (3., 3.), (1., 3.), (1., 2.), (0., 2.)]);
-///
-/// let result = boolean_multi_op(edge_intersection_float, &[&p1], &[&p2],
-///     &[Operation::Union]);
-///
-/// assert_eq!(result[0].len(), 1);
-/// assert_eq!(result[0].polygons[0], expected_union);
-/// ```
-pub fn boolean_multi_op<I, F>(edge_intersection: I,
-                              subject: &[&Polygon<F>],
-                              clipping: &[&Polygon<F>],
-                              operations: &[Operation]) -> Vec<MultiPolygon<F>>
-    where I: Fn(&Edge<F>, &Edge<F>) -> EdgeIntersection<F, F>,
-          F: CoordinateType + Debug {
-    let mut event_id_generator = (1..).into_iter();
-    // Prepare the event queue.
-    let mut event_queue = fill_queue(subject, clipping);
-
-    // Compute the edge intersections, the result is a set of sorted non-intersecting edges stored
-    // as events.
-    let sorted_events = subdivide_segments(
-        edge_intersection,
-        &mut event_queue,
-        &mut event_id_generator,
-    );
-
-    // Connect the edges into polygons.
-    let results = operations.iter()
-        .map(|&o| {
-            let r = connect_edges(&sorted_events, o);
-            MultiPolygon::new(r)
-        }
-        ).collect();
-
-    results
 }
 
 /// Perform boolean operation.
@@ -220,12 +173,26 @@ pub fn boolean_op<I, F>(edge_intersection: I,
                         operation: Operation) -> MultiPolygon<F>
     where I: Fn(&Edge<F>, &Edge<F>) -> EdgeIntersection<F, F>,
           F: CoordinateType + Debug {
-    let mut result = boolean_multi_op(edge_intersection,
-                                      subject,
-                                      clipping,
-                                      &[operation]);
-    result.remove(0)
+    let mut event_id_generator = (1..).into_iter();
+    // Prepare the event queue.
+    let mut event_queue = fill_queue(subject, clipping);
+
+    // Compute the edge intersections, the result is a set of sorted non-intersecting edges stored
+    // as events.
+    let sorted_events = subdivide_segments(
+        edge_intersection,
+        &mut event_queue,
+        &mut event_id_generator,
+    );
+
+
+    // dbg!(&sorted_events);
+
+    // Connect the edges into polygons.
+    let r = connect_edges(&sorted_events, operation);
+    MultiPolygon::new(r)
 }
+
 
 /// Compute approximate intersection point of two edges in floating point coordinates.
 pub fn edge_intersection_float<F: Float>(e1: &Edge<F>, e2: &Edge<F>) -> EdgeIntersection<F, F> {
@@ -320,6 +287,7 @@ fn subdivide_segments<T: CoordinateType + Debug, I>(
 
             let maybe_prev = scan_line.prev(&event);
             if let Some(prev) = maybe_prev {
+                // Debug-assert that the ordering of scan line elements is correct.
                 debug_assert_ne!(compare_events_by_segments(&event, prev), Ordering::Less);
             }
 
@@ -327,12 +295,14 @@ fn subdivide_segments<T: CoordinateType + Debug, I>(
 
 
             if let Some(next) = maybe_next {
+                // Debug-assert that the ordering of scan line elements is correct.
                 debug_assert!(compare_events_by_segments(&event, next) != Ordering::Greater);
                 possible_intersection(&edge_intersection,
                                       &event, &next, event_queue);
             }
 
             if let Some(prev) = maybe_prev {
+                // Debug-assert that the ordering of scan line elements is correct.
                 debug_assert_ne!(compare_events_by_segments(&event, prev), Ordering::Less);
                 possible_intersection(&edge_intersection,
                                       &prev, &event, event_queue);
@@ -350,7 +320,7 @@ fn subdivide_segments<T: CoordinateType + Debug, I>(
                 let maybe_prev = scan_line.prev(&left_event).cloned();
                 let maybe_next = scan_line.next(&left_event).cloned();
 
-                println!("remove {:?}", left_event.get_edge_id());
+                // println!("remove {:?}", left_event.get_edge_id());
                 scan_line.remove(&left_event);
 
                 // prev and next are possibly new neighbours. Check for intersection.
@@ -372,7 +342,7 @@ fn subdivide_segments<T: CoordinateType + Debug, I>(
     debug_assert!(sorted_events.windows(2).all(|w| w[0] >= w[1]),
                   "Events are not sorted.");
 
-    // Merge duplicated edges.j
+    // Merge duplicated edges.
     (&sorted_events).into_iter()
         // Process left events only.
         .filter(|e| e.is_left_event())
@@ -402,6 +372,11 @@ fn merge_edges<T: CoordinateType + Debug>(edge: Edge<T>, events: Vec<&Rc<SweepEv
     // Compute the parity of the edges.
     // Two edges of the same polygon type (subject or clipping) cancel each other out.
     // Therefore for each polygon type at most one edge will remain.
+
+    // Get previous edge below the set overlapping edges.
+    let prev = events.first()
+        .map(|e| e.get_prev())
+        .unwrap_or(Weak::new());
 
     let mut last_subject = None;
     let mut last_clipping = None;
@@ -445,6 +420,12 @@ fn merge_edges<T: CoordinateType + Debug>(edge: Edge<T>, events: Vec<&Rc<SweepEv
                 true => EdgeType::SameTransition
             }
         );
+        // Update predecessor.
+        c.set_prev(prev);
+    } else if let Some(s) = last_subject {
+        s.set_prev(prev);
+    } else if let Some(c) = last_clipping {
+        c.set_prev(prev);
     }
 
     // Compute the correct `outside` field for the chosen edge.
@@ -468,7 +449,7 @@ fn merge_edges<T: CoordinateType + Debug>(edge: Edge<T>, events: Vec<&Rc<SweepEv
                 let flip_outside_flag = num_other_edges % 2 == 1;
                 // Now flip the outside flag.
                 edge.set_upper_boundary(edge.is_upper_boundary(),
-                                        edge.is_outside_other() ^ flip_outside_flag)
+                                        edge.is_outside_other() ^ flip_outside_flag);
             }
             _ => ()
         }
@@ -558,7 +539,23 @@ mod test {
             edge_intersection_float, &[&p1], &[&p1], Operation::Union);
 
         assert_eq!(i.len(), 1);
-        assert_eq!(&p1, &p1);
+        assert_eq!(&i.polygons[0], &p1);
+    }
+
+    #[test]
+    fn test_xor_same_polygon() {
+        let p1 = Polygon::from(vec![(0., 0.), (2., 0.), (2., 2.)]);
+
+        let i = boolean_op(
+            edge_intersection_float, &[&p1], &[&p1], Operation::Xor);
+
+        assert_eq!(i.len(), 0);
+
+        let i = boolean_op(
+            edge_intersection_float, &[&p1, &p1], &[&p1], Operation::Xor);
+
+        assert_eq!(i.len(), 1);
+        assert_eq!(&i.polygons[0], &p1);
     }
 
     #[test]
@@ -574,6 +571,9 @@ mod test {
             &[&little_square_inside, &little_square_outside],
             Operation::Xor,
         );
+
+        assert!(i.polygons.iter().any(|p| p.interiors.len() == 1));
+        assert!(i.polygons.iter().any(|p| p.interiors.len() == 0));
 
         assert!(i.contains_point((0.1, 0.1).into()));
         assert!(!i.contains_point((2.1, 1.1).into()));
@@ -858,15 +858,18 @@ Operation::Intersection,
             let a = rand_polygon(5);
             let b = rand_polygon(4);
 
-            let results = boolean_multi_op(
-                edge_intersection_rational,
-                &[&a],
-                &[&b],
-                &[Operation::Intersection,
-                    Operation::Union,
-                    Operation::Difference,
-                    Operation::Xor],
-            );
+            let results: Vec<_> = vec![Operation::Intersection,
+                                       Operation::Union,
+                                       Operation::Difference,
+                                       Operation::Xor]
+                .into_iter()
+                .map(|operation| boolean_op(
+                    edge_intersection_rational,
+                    &[&a],
+                    &[&b],
+                    operation,
+                )).collect();
+
 
             // Create grid of probe points.
             let mut rng = StdRng::from_seed(seed2);
