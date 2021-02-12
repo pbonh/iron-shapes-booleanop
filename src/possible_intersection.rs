@@ -65,24 +65,20 @@ fn divide_segment<T>(event: &Rc<SweepEvent<T>>,
                       "Intersection point must lie on the edge but not on the end-points.");
 
         let r = SweepEvent::new_rc(
-            event.contour_id,
             event.get_edge_id(),
             inter,
             false,
             Rc::downgrade(&event),
             event.polygon_type,
-            EdgeType::Normal,
-            true);
+            EdgeType::Normal);
 
         let l = SweepEvent::new_rc(
-            event.contour_id,
             event.get_edge_id(),
             inter,
             true,
             Rc::downgrade(&other_event),
             event.polygon_type,
             EdgeType::Normal,
-            true,
         );
 
         debug_assert!(event.p <= r.p);
@@ -205,63 +201,6 @@ pub fn possible_intersection<F, I>(
             if left_coincide {
                 if right_coincide {
                     // Edges are equal. No need to split any.
-
-                    // // Overlapping edges are reduced to a single contributing edge.
-                    // debug_assert_eq!(event2.get_edge_type(), EdgeType::Normal,
-                    //                  "Edge type of next segment should not be changed yet.");
-                    // // debug_assert_ne!(event1.get_edge_type(), EdgeType::NonContributing);
-                    //
-                    // // Check that the edges are ordered by 'subject edges first, then clipping edges'.
-                    // debug_assert!(!(event1.polygon_type == PolygonType::Clipping && event2.polygon_type == PolygonType::Subject),
-                    //               "Subject edges must come first.");
-                    //
-                    // if event1.polygon_type == event2.polygon_type {
-                    //     if event1.polygon_type == PolygonType::Subject {
-                    //         if event1.get_edge_type() != EdgeType::NonContributing {
-                    //             // Two edges cancel each other.
-                    //             event2.set_edge_type(EdgeType::NonContributing);
-                    //         }
-                    //     } else {
-                    //         // Clipping.
-                    //     }
-                    // } else {
-                    //     debug_assert_eq!(event1.polygon_type, PolygonType::Subject);
-                    //     if event1.get_edge_type() != EdgeType::NonContributing {
-                    //         if event1.is_upper_boundary() == event2.is_upper_boundary() {
-                    //             event2.set_edge_type(EdgeType::SameTransition);
-                    //         } else {
-                    //             event2.set_edge_type(EdgeType::DifferentTransition);
-                    //         }
-                    //     }
-                    // }
-                    //
-                    // //
-                    // // if event1.is_upper_boundary() == event2.is_upper_boundary() {
-                    // //     event2.set_edge_type(EdgeType::SameTransition);
-                    // // } else {
-                    // //     event2.set_edge_type(EdgeType::DifferentTransition);
-                    // // }
-                    //
-                    // // Disable the lower edge.
-                    // event1.set_edge_type(EdgeType::NonContributing);
-                    // // Update the previous segment of the upper event because the current
-                    // // previous segment has been just disabled.
-                    // event2.set_prev(event1.get_prev());
-                    //
-                    // // if !edge1.is_vertical() {
-                    // //     // Adjust flags of the upper edge to be consistent with removing the lower edge.
-                    // //     if event1.polygon_type == event2.polygon_type {
-                    // //         event2.set_upper_boundary(
-                    // //             event1.is_upper_boundary(),
-                    // //             event1.is_outside_other(),
-                    // //         )
-                    // //     } else {
-                    // //         event2.set_upper_boundary(
-                    // //             event2.is_upper_boundary(),
-                    // //             !event1.is_outside_other(),
-                    // //         )
-                    // //     }
-                    // // }
                 } else {
                     // Left points coincide but not right.
                     debug_assert!(edge1.end != edge2.end);

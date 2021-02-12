@@ -47,9 +47,7 @@ fn fill_queue<T: CoordinateType>(subject: &[&Polygon<T>],
     /// Add edges of a polygon to the event queue.
     fn process_polygon<T: CoordinateType>(event_queue: &mut BinaryHeap<Rc<SweepEvent<T>>>,
                                           poly: &SimplePolygon<T>,
-                                          polygon_type: PolygonType,
-                                          contour_id: usize,
-                                          is_hull: bool) {
+                                          polygon_type: PolygonType) {
         for edge in poly.edges() {
             // Skip degenerate edges.
             if !edge.is_degenerate() {
@@ -57,24 +55,20 @@ fn fill_queue<T: CoordinateType>(subject: &[&Polygon<T>],
                 let edge_id = usize::MAX;
                 let event_a_is_left = edge.start < edge.end;
                 let event_a = SweepEvent::new_rc(
-                    contour_id,
                     edge_id,
                     edge.start,
                     event_a_is_left,
                     Weak::new(),
                     polygon_type,
                     EdgeType::Normal,
-                    is_hull,
                 );
                 let event_b = SweepEvent::new_rc(
-                    contour_id,
                     edge_id,
                     edge.end,
                     !event_a_is_left,
                     Rc::downgrade(&event_a),
                     polygon_type,
                     EdgeType::Normal,
-                    is_hull,
                 );
 
 
@@ -87,24 +81,21 @@ fn fill_queue<T: CoordinateType>(subject: &[&Polygon<T>],
     }
     ;
 
-    let mut contour_id = 0;
-
     // Subject polygons.
     for p in subject {
-        contour_id += 1;
-        process_polygon(&mut event_queue, &p.exterior, PolygonType::Subject, contour_id, true);
+        process_polygon(&mut event_queue, &p.exterior, PolygonType::Subject);
         for i in &p.interiors {
             // Holes
-            process_polygon(&mut event_queue, i, PolygonType::Subject, contour_id, false);
+            process_polygon(&mut event_queue, i, PolygonType::Subject);
         }
     }
 
     // Clipping polygons.
     for p in clipping {
-        process_polygon(&mut event_queue, &p.exterior, PolygonType::Clipping, contour_id, true);
+        process_polygon(&mut event_queue, &p.exterior, PolygonType::Clipping);
         for i in &p.interiors {
             // Holes
-            process_polygon(&mut event_queue, i, PolygonType::Clipping, contour_id, false);
+            process_polygon(&mut event_queue, i, PolygonType::Clipping);
         }
     }
 

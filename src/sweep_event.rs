@@ -62,7 +62,7 @@ pub enum ResultBoundaryType {
     /// Edge is a lower boundary of the result.
     Lower,
     /// Edge is an upper boundary of the result.
-    Upper
+    Upper,
 }
 
 /// Mutable data of a sweep event.
@@ -91,24 +91,20 @@ pub struct SweepEvent<T: CoordinateType> {
     mutable: RefCell<MutablePart<T>>,
     /// Point associated with the event. Starting point or end point of the edge.
     pub p: Point<T>,
-    pub contour_id: usize,
     /// Type of polygon: either SUBJECT or CLIPPING.
     pub polygon_type: PolygonType,
-    pub is_hull: bool,
 }
 
 
 impl<T: CoordinateType> SweepEvent<T> {
     /// Create a new sweep event wrapped into a `Rc`.
     pub fn new_rc(
-        contour_id: usize,
         edge_id: usize,
         point: Point<T>,
         is_left_event: bool,
         other_event: Weak<SweepEvent<T>>,
         polygon_type: PolygonType,
         edge_type: EdgeType,
-        is_hull: bool,
     ) -> Rc<SweepEvent<T>> {
         Rc::new(SweepEvent {
             mutable: RefCell::new(MutablePart {
@@ -122,9 +118,7 @@ impl<T: CoordinateType> SweepEvent<T> {
                 edge_id,
             }),
             p: point,
-            contour_id,
             polygon_type,
-            is_hull,
         })
     }
 
@@ -297,14 +291,7 @@ impl<'a, T> Ord for SweepEvent<T>
                             Side::Center => {
                                 debug_assert!(edge1.is_collinear(&edge2));
                                 // Break the tie by the polygon type and then the edge_id.
-                                // other.get_edge_id().cmp(&self.get_edge_id())
-                                // Ordering by the polygon type is needed for resolving multiple overlapping edges.
-                                let by_polygon_type = match (other.polygon_type, self.polygon_type) {
-                                    (PolygonType::Subject, PolygonType::Clipping) => Ordering::Less,
-                                    (PolygonType::Clipping, PolygonType::Subject) => Ordering::Greater,
-                                    (_, _) => Ordering::Equal,
-                                };
-                                by_polygon_type.then_with(|| other.get_edge_id().cmp(&self.get_edge_id()))
+                                other.get_edge_id().cmp(&self.get_edge_id())
                             }
                         }
                     }
@@ -325,23 +312,19 @@ mod test {
     fn test_prefer_right_events_over_left_events() {
         let left = SweepEvent::new_rc(
             0,
-            0,
             (0, 0).into(),
             true, // left
             Weak::new(),
             PolygonType::Subject,
             EdgeType::Normal,
-            true, // is_hull
         );
         let right = SweepEvent::new_rc(
-            0,
             0,
             (0, 0).into(),
             false, // right
             Weak::new(),
             PolygonType::Subject,
             EdgeType::Normal,
-            true, // is_hull
         );
 
         assert!(right > left);
@@ -351,23 +334,19 @@ mod test {
     fn test_on_equal_x_sort_y() {
         let lower = SweepEvent::new_rc(
             0,
-            0,
             (0, 0).into(),
             true, // left
             Weak::new(),
             PolygonType::Subject,
             EdgeType::Normal,
-            true, // is_hull
         );
         let upper = SweepEvent::new_rc(
-            0,
             0,
             (0, 1).into(),
             false, // right
             Weak::new(),
             PolygonType::Subject,
             EdgeType::Normal,
-            true, // is_hull
         );
 
         assert!(lower > upper);

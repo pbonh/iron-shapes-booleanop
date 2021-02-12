@@ -100,15 +100,9 @@ pub fn compare_events_by_segments<T>(le1: &Rc<SweepEvent<T>>,
 //       TODO: if edge1.is_collinear_approx(edge2, tolerance) {
     if edge1.is_collinear(&edge2) {
         // Segments are collinear, thus they intersect the scan line in the same point.
-        // Break the tie by the polygon type and then the edge_id.
+        // Break the tie by the edge_id.
 
-        // Ordering by the polygon type is needed for resolving multiple overlapping edges.
-        let by_polygon_type = match (le1.polygon_type, le2.polygon_type) {
-            (PolygonType::Subject, PolygonType::Clipping) => Ordering::Less,
-            (PolygonType::Clipping, PolygonType::Subject) => Ordering::Greater,
-            (_, _) => Ordering::Equal,
-        };
-        by_polygon_type.then_with(|| le1.get_edge_id().cmp(&le2.get_edge_id()))
+        le1.get_edge_id().cmp(&le2.get_edge_id())
     } else {
         // Segments are not collinear.
 
@@ -155,31 +149,26 @@ mod test {
     use super::*;
 
     fn make_event_pair(
-        contour_id: usize,
         event_id: usize,
         left: (f64, f64),
         right: (f64, f64),
         polygon_type: PolygonType,
     ) -> (Rc<SweepEvent<f64>>, Rc<SweepEvent<f64>>) {
         let other = SweepEvent::new_rc(
-            contour_id,
             event_id,
             right.into(),
             false,
             Weak::new(),
             polygon_type,
             EdgeType::Normal,
-            true,
         );
         let event = SweepEvent::new_rc(
-            contour_id,
             event_id,
             left.into(),
             true,
             Rc::downgrade(&other),
             polygon_type,
             EdgeType::Normal,
-            true,
         );
         other.set_other_event(&event);
 
@@ -189,7 +178,7 @@ mod test {
     fn simple_event_pair(
         left: (f64, f64),
         right: (f64, f64)) -> (Rc<SweepEvent<f64>>, Rc<SweepEvent<f64>>) {
-        make_event_pair(0, 0, left, right, PolygonType::Clipping)
+        make_event_pair(0, left, right, PolygonType::Clipping)
     }
 
     #[test]
@@ -253,9 +242,9 @@ mod test {
 
 
         let (se1, _other1) =
-            make_event_pair(0, 0, (0.0, 0.0), (0.0, 1.0), PolygonType::Clipping);
+            make_event_pair(0, (0.0, 0.0), (0.0, 1.0), PolygonType::Clipping);
         let (se2, _other2) =
-            make_event_pair(0, 1, (0.0, 0.0), (0.0, 2.0), PolygonType::Clipping);
+            make_event_pair(1, (0.0, 0.0), (0.0, 2.0), PolygonType::Clipping);
 
         // Break tie by event_id.
         assert_eq!(compare_events_by_segments(&se1, &se2), Ordering::Less);
@@ -263,9 +252,9 @@ mod test {
 
         // Swap event ids.
         let (se1, _other1) =
-            make_event_pair(0, 1, (0.0, 0.0), (0.0, 1.0), PolygonType::Clipping);
+            make_event_pair(1, (0.0, 0.0), (0.0, 1.0), PolygonType::Clipping);
         let (se2, _other2) =
-            make_event_pair(0, 0, (0.0, 0.0), (0.0, 2.0), PolygonType::Clipping);
+            make_event_pair(0, (0.0, 0.0), (0.0, 2.0), PolygonType::Clipping);
 
         // Break tie by event_id.
         assert_eq!(compare_events_by_segments(&se1, &se2), Ordering::Greater);

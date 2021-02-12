@@ -211,7 +211,7 @@ fn order_events<T>(events: &mut Vec<Rc<SweepEvent<T>>>) -> Vec<Event<T>>
                 is_left_event: event.is_left_event(),
                 is_hull: event.is_outside_other(),
                 polygon_type: event.polygon_type,
-                contour_id: event.contour_id,
+                contour_id: usize::max_value(),
             }
         }
         ).collect();
