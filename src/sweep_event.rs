@@ -31,16 +31,6 @@ pub enum PolygonType {
     Clipping,
 }
 
-impl PolygonType {
-    /// Return the other type.
-    pub fn other(&self) -> Self {
-        match self {
-            PolygonType::Clipping => PolygonType::Subject,
-            PolygonType::Subject => PolygonType::Clipping
-        }
-    }
-}
-
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum EdgeType {
     Normal,
@@ -52,17 +42,6 @@ pub enum EdgeType {
     /// The edge represents two collinear edges of different polygons. They have
     /// the 'inside' of the polygon on *different* sides.
     DifferentTransition,
-}
-
-/// Tell what kind of boundary this edge forms in the result.
-#[derive(Debug, PartialEq, Eq, Copy, Clone)]
-pub enum ResultBoundaryType {
-    /// Edge is no boundary of the result. Does not contribute to the result.
-    None,
-    /// Edge is a lower boundary of the result.
-    Lower,
-    /// Edge is an upper boundary of the result.
-    Upper,
 }
 
 /// Mutable data of a sweep event.
@@ -126,9 +105,9 @@ impl<T: CoordinateType> SweepEvent<T> {
         self.mutable.borrow().is_left_event
     }
 
-    pub fn set_left_event(&self, left: bool) {
-        self.mutable.borrow_mut().is_left_event = left
-    }
+    // pub fn set_left_event(&self, left: bool) {
+    //     self.mutable.borrow_mut().is_left_event = left
+    // }
 
     /// Get the event that represents the other end point of this segment.
     pub fn get_other_event(&self) -> Option<Rc<SweepEvent<T>>> {

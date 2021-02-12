@@ -21,7 +21,7 @@
 //! Compute the ordering among edges. This is used to keep sweep events in the right ordering
 //! in the scan line.
 
-use std::rc::{Rc, Weak};
+use std::rc::Rc;
 use iron_shapes::edge::{Edge, Side};
 use std::cmp::Ordering;
 use iron_shapes::CoordinateType;
@@ -147,6 +147,7 @@ pub fn compare_events_by_segments<T>(le1: &Rc<SweepEvent<T>>,
 #[cfg(test)]
 mod test {
     use super::*;
+    use std::rc::Weak;
 
     fn make_event_pair(
         event_id: usize,
