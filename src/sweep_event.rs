@@ -59,6 +59,7 @@ struct MutablePart<T: CoordinateType> {
     edge_type: EdgeType,
     /// Is this event outside of the other polygon?
     is_outside_other: bool,
+    /// Index of this event in an array.
     pos: usize,
     /// Unique ID of the edge. Used to break ties and guarantee ordering for overlapping edges.
     edge_id: usize,

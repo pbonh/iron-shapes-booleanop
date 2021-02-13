@@ -40,8 +40,11 @@ use itertools::Itertools;
 use std::usize;
 
 /// Insert the edges of the polygons into the event queue.
-fn fill_queue<T: CoordinateType>(subject: &[&Polygon<T>],
-                                 clipping: &[&Polygon<T>]) -> BinaryHeap<Rc<SweepEvent<T>>> {
+fn fill_queue<'a, T, S, C>(subject: S,
+                           clipping: C) -> BinaryHeap<Rc<SweepEvent<T>>>
+    where S: Iterator<Item=&'a Polygon<T>>,
+          C: Iterator<Item=&'a Polygon<T>>,
+          T: CoordinateType + 'a {
     let mut event_queue = BinaryHeap::new();
 
     /// Add edges of a polygon to the event queue.
@@ -153,20 +156,27 @@ pub fn compute_fields<T>(event: &Rc<SweepEvent<T>>,
 /// let expected_union = Polygon::from(vec![(0., 0.), (2., 0.), (2., 1.), (3., 1.),
 ///                                                 (3., 3.), (1., 3.), (1., 2.), (0., 2.)]);
 ///
-/// let i = boolean_op(edge_intersection_float, &[&p1], &[&p2], Operation::Union);
+/// let i = boolean_op(edge_intersection_float, vec![&p1], vec![&p2], Operation::Union);
 ///
 /// assert_eq!(i.len(), 1);
 /// assert_eq!(i.polygons[0], expected_union);
 /// ```
-pub fn boolean_op<I, F>(edge_intersection: I,
-                        subject: &[&Polygon<F>],
-                        clipping: &[&Polygon<F>],
-                        operation: Operation) -> MultiPolygon<F>
-    where I: Fn(&Edge<F>, &Edge<F>) -> EdgeIntersection<F, F>,
-          F: CoordinateType + Debug {
+pub fn boolean_op<'a, I, T, S, C>(edge_intersection: I,
+                                  subject: S,
+                                  clipping: C,
+                                  operation: Operation) -> MultiPolygon<T>
+    where I: Fn(&Edge<T>, &Edge<T>) -> EdgeIntersection<T, T>,
+          T: CoordinateType + Debug + 'a,
+          S: IntoIterator<Item=&'a Polygon<T>>,
+          C: IntoIterator<Item=&'a Polygon<T>>,
+{
     let mut event_id_generator = (1..).into_iter();
+
     // Prepare the event queue.
-    let mut event_queue = fill_queue(subject, clipping);
+    let mut event_queue = fill_queue(
+        subject.into_iter(),
+        clipping.into_iter(),
+    );
 
     // Compute the edge intersections, the result is a set of sorted non-intersecting edges stored
     // as events.
@@ -464,12 +474,7 @@ mod test {
         let p1 = Polygon::from(vec![(0., 0.), (1., 1.)]);
         let p2 = Polygon::from(vec![(1., 0.), (0., 1.)]);
 
-        let i = boolean_op(
-            edge_intersection_float,
-            &[&p1],
-            &[&p2],
-            Operation::Intersection,
-        );
+        let i = p1.intersection(&p2);
 
         assert_eq!(i.len(), 0);
     }
@@ -500,8 +505,7 @@ mod test {
         let expected_union = Polygon::from(vec![(0., 0.), (2., 0.), (2., 1.), (3., 1.),
                                                 (3., 3.), (1., 3.), (1., 2.), (0., 2.)]);
 
-        let i = boolean_op(
-            edge_intersection_float, &[&p1], &[&p2], Operation::Union);
+        let i = p1.union(&p2);
 
         assert_eq!(i.len(), 1);
         assert_eq!(i.polygons[0], expected_union);
@@ -516,7 +520,7 @@ mod test {
                                                 (3, 3), (1, 3), (1, 2), (0, 2)]);
 
         let i = boolean_op(
-            edge_intersection_integer, &[&p1], &[&p2], Operation::Union);
+            edge_intersection_integer, &[p1], &[p2], Operation::Union);
 
         assert_eq!(i.len(), 1);
         assert_eq!(i.polygons[0], expected_union);
@@ -527,7 +531,7 @@ mod test {
         let p1 = Polygon::from(vec![(0., 0.), (2., 0.), (2., 2.)]);
 
         let i = boolean_op(
-            edge_intersection_float, &[&p1], &[&p1], Operation::Union);
+            edge_intersection_float, vec![&p1], vec![&p1], Operation::Union);
 
         assert_eq!(i.len(), 1);
         assert_eq!(&i.polygons[0], &p1);
@@ -538,12 +542,19 @@ mod test {
         let p1 = Polygon::from(vec![(0., 0.), (2., 0.), (2., 2.)]);
 
         let i = boolean_op(
-            edge_intersection_float, &[&p1], &[&p1], Operation::Xor);
+            edge_intersection_float, vec![&p1], vec![&p1], Operation::Xor);
 
         assert_eq!(i.len(), 0);
 
         let i = boolean_op(
-            edge_intersection_float, &[&p1, &p1], &[&p1], Operation::Xor);
+            edge_intersection_float, vec![&p1, &p1], vec![&p1], Operation::Xor);
+
+        assert_eq!(i.len(), 1);
+        assert_eq!(&i.polygons[0], &p1);
+
+
+        let i = boolean_op(
+            edge_intersection_float, vec![&p1], vec![&p1, &p1], Operation::Xor);
 
         assert_eq!(i.len(), 1);
         assert_eq!(&i.polygons[0], &p1);
@@ -558,8 +569,8 @@ mod test {
 
         let i = boolean_op(
             edge_intersection_float,
-            &[&big_square],
-            &[&little_square_inside, &little_square_outside],
+            &[big_square],
+            &[little_square_inside, little_square_outside],
             Operation::Xor,
         );
 
@@ -580,8 +591,8 @@ mod test {
 
         let result = boolean_op(
             edge_intersection_float,
-            &[&square1],
-            &[&square2],
+            vec![&square1],
+            vec![&square2],
             Operation::Xor,
         );
 
@@ -703,8 +714,8 @@ mod test {
 
         let result = boolean_op(
             edge_intersection_rational,
-            &[&a],
-            &[&b],
+            vec![&a],
+            vec![&b],
             Operation::Intersection,
         );
 
@@ -729,8 +740,8 @@ mod test {
         let result = boolean_op(
             edge_intersection_rational,
 //            edge_intersection_integer,
-            &[&a],
-            &[&b],
+            vec![&a],
+            vec![&b],
             Operation::Intersection,
         );
 
@@ -754,8 +765,8 @@ mod test {
 
         let result = boolean_op(
             edge_intersection_integer,
-            &[&a],
-            &[&b],
+            vec![&a],
+            vec![&b],
             Operation::Intersection,
         );
 
@@ -785,8 +796,8 @@ mod test {
 
         let result = boolean_op(
             edge_intersection_rational,
-            &[&a],
-            &[&b],
+            vec![&a],
+            vec![&b],
             Operation::Intersection,
         );
 
@@ -812,8 +823,8 @@ mod test {
         let result = boolean_op(
 //            edge_intersection_integer,
 edge_intersection_rational,
-&[&a],
-&[&b],
+vec![&a],
+vec![&b],
 Operation::Intersection,
         );
 
@@ -856,8 +867,8 @@ Operation::Intersection,
                 .into_iter()
                 .map(|operation| boolean_op(
                     edge_intersection_rational,
-                    &[&a],
-                    &[&b],
+                    vec![&a],
+                    vec![&b],
                     operation,
                 )).collect();
 

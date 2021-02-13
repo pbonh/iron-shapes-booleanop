@@ -31,6 +31,9 @@ mod possible_intersection;
 // API exports.
 pub use intersection::boolean_op;
 pub use intersection::{edge_intersection_float, edge_intersection_integer, edge_intersection_rational};
+use iron_shapes::CoordinateType;
+use iron_shapes::multi_polygon::MultiPolygon;
+use iron_shapes::polygon::Polygon;
 
 /// Type of boolean operation.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -44,3 +47,75 @@ pub enum Operation {
     /// Compute the boolean XOR.
     Xor,
 }
+
+/// Trait for geometric primitives that support boolean operations.
+pub trait BooleanOp<T: CoordinateType> {
+    /// Compute the boolean operation of `self` and `other`.
+    fn boolean_op(&self, operation: Operation, other: &Self) -> MultiPolygon<T>;
+
+    /// Compute the boolean intersection `self & other`.
+    fn intersection(&self, other: &Self) -> MultiPolygon<T> {
+        self.boolean_op(Operation::Intersection, other)
+    }
+
+    /// Compute the boolean difference `self - other`.
+    fn difference(&self, other: &Self) -> MultiPolygon<T> {
+        self.boolean_op(Operation::Difference, other)
+    }
+
+    /// Compute the boolean union `self | other`.
+    fn union(&self, other: &Self) -> MultiPolygon<T> {
+        self.boolean_op(Operation::Union, other)
+    }
+
+    /// Compute the boolean exclusive OR `self ^ other`.
+    fn xor(&self, other: &Self) -> MultiPolygon<T> {
+        self.boolean_op(Operation::Xor, other)
+    }
+}
+
+/// Implement the `BooleanOp` trait for `MultiPolygon<...>`.
+macro_rules! impl_booleanop_multipolygon {
+ ($coord:ty, $edge_intersection:ident) => {
+     impl BooleanOp<$coord> for MultiPolygon<$coord> {
+        fn boolean_op(&self, operation: Operation, other: &Self) -> MultiPolygon<$coord> {
+            let subject = self.polygons.iter();
+            let clipping = other.polygons.iter();
+            boolean_op(
+                &$edge_intersection,
+                subject,
+                clipping,
+                operation,
+            )
+        }
+    }
+ }
+}
+
+impl_booleanop_multipolygon!(f32, edge_intersection_float);
+impl_booleanop_multipolygon!(f64, edge_intersection_float);
+impl_booleanop_multipolygon!(i32, edge_intersection_integer);
+impl_booleanop_multipolygon!(i64, edge_intersection_integer);
+
+/// Implement the `BooleanOp` trait for `Polygon<...>`.
+macro_rules! impl_booleanop_polygon {
+ ($coord:ty, $edge_intersection:ident) => {
+     impl BooleanOp<$coord> for Polygon<$coord> {
+        fn boolean_op(&self, operation: Operation, other: &Self) -> MultiPolygon<$coord> {
+            let subject = std::iter::once(self);
+            let clipping = std::iter::once(other);
+            boolean_op(
+                &$edge_intersection,
+                subject,
+                clipping,
+                operation,
+            )
+        }
+    }
+ }
+}
+
+impl_booleanop_polygon!(f32, edge_intersection_float);
+impl_booleanop_polygon!(f64, edge_intersection_float);
+impl_booleanop_polygon!(i32, edge_intersection_integer);
+impl_booleanop_polygon!(i64, edge_intersection_integer);
