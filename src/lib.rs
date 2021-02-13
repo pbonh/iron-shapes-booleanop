@@ -21,6 +21,28 @@
 #![deny(missing_docs)]
 
 //! Library for boolean operations on polygons.
+//!
+//! # Example
+//!
+//! ```
+//! use iron_shapes::prelude::*;
+//! use iron_shapes_booleanop::BooleanOp;
+//!
+//! // Create two polygons.
+//! let p1 = Polygon::from(vec![(0., 0.), (2., 0.), (2., 1.), (0., 1.)]);
+//! let p2 = p1.translate((1., 0.).into()); // Shift p1 by (1, 0).
+//!
+//! // Compute the boolean intersection of the two squares.
+//! let intersection = p1.intersection(&p2);
+//! assert_eq!(intersection.polygons.len(), 1);
+//! assert_eq!(intersection.polygons[0], Polygon::from(vec![(1., 0.), (2., 0.), (2., 1.), (1., 1.)]));
+//!
+//! // Compute the boolean exclusive-or of the two squares.
+//! // This results in two unconnected polygons. This demonstrates why boolean operations return always
+//! // a `MultiPolygon`.
+//! let intersection = p1.xor(&p2);
+//! assert_eq!(intersection.polygons.len(), 2);
+//! ```
 
 mod intersection;
 mod sweep_event;
