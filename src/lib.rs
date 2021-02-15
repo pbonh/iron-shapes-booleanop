@@ -71,6 +71,24 @@ pub enum Operation {
     Xor,
 }
 
+/// Define the 'inside' of a polygon.
+///
+/// * `Union`: A point `p` is inside the polygon if the winding number is larger than `0`.
+/// This means that if a polygon overlaps with itself or multiple polygons overlap, the overlapping
+/// area is always 'inside'.
+/// * `XOR`: A point `p` is inside the polygon if the winding number modulo 2 is larger than `0`.
+/// This means that if an odd number of polygons overlap, the overlapping area is 'inside' the polygon.
+/// In case of an even number of overlaps, the overlapping area is 'outside'.
+///
+/// This plays an important role for self-overlapping polygons and self-overlapping multi-polygons.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub enum PolygonSemantics {
+    /// A point `p` is inside the polygon if the winding number is larger than `0`.
+    Union,
+    /// A point `p` is inside the polygon if the winding number modulo 2 is larger than `0`.
+    XOR
+}
+
 /// Trait for geometric primitives that support boolean operations.
 pub trait BooleanOp<T: CoordinateType> {
     /// Compute the boolean operation of `self` and `other`.
