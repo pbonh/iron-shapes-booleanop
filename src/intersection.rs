@@ -22,7 +22,7 @@ use std::collections::binary_heap::BinaryHeap;
 use std::rc::{Rc, Weak};
 use iron_shapes::polygon::{Polygon, SimplePolygon};
 use iron_shapes::edge::{Edge, EdgeIntersection};
-use num_rational::Rational;
+use num_rational::Ratio;
 use iron_shapes::multi_polygon::MultiPolygon;
 
 use iron_shapes::CoordinateType;
@@ -38,6 +38,7 @@ use std::ops::RangeFrom;
 use std::cmp::Ordering;
 use itertools::Itertools;
 use std::usize;
+use num_integer::Integer;
 
 /// Insert the edges of the polygons into the event queue.
 fn fill_queue<'a, T, S, C>(subject: S,
@@ -202,7 +203,9 @@ pub fn edge_intersection_float<F: Float>(e1: &Edge<F>, e2: &Edge<F>) -> EdgeInte
 
 /// Compute the intersection of edges with rational coordinates.
 /// In rational coordinates intersections can be computed exactly.
-pub fn edge_intersection_rational(e1: &Edge<Rational>, e2: &Edge<Rational>) -> EdgeIntersection<Rational, Rational> {
+pub fn edge_intersection_rational<T>(e1: &Edge<Ratio<T>>, e2: &Edge<Ratio<T>>)
+                                     -> EdgeIntersection<Ratio<T>, Ratio<T>>
+    where T: CoordinateType + Integer {
     e1.edge_intersection_rational(e2)
 }
 
