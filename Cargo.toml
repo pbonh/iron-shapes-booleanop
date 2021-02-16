@@ -15,4 +15,4 @@ iron-shapes = {path = "../iron-shapes"}
 libreda-splay = {path = "../splay"}
 
 [dev-dependencies]
-rand = "0.7" # For randomized tests.
+rand = "0.8" # For randomized tests.
