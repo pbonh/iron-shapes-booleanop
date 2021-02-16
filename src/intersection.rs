@@ -122,21 +122,7 @@ pub fn compute_fields<T>(event: &Rc<SweepEvent<T>>,
 {
     if let Some(prev) = maybe_prev {
         let is_same_type = event.polygon_type == prev.polygon_type;
-
-        // let upper_boundary = match (event.is_vertical(), is_same_type) {
-        //     (false, false) => !prev.other_edge_count(),
-        //     (false, true) => !prev.edge_count(),
-        //
-        //     (true, false) => prev.other_edge_count(),
-        //     (true, true) => prev.edge_count(),
-        // };
-        //
-        // let is_outside_other = match is_same_type {
-        //     false => prev.edge_count(),
-        //     true => prev.other_edge_count(),
-        // };
-
-
+        
         let edge_count = if is_same_type {
             prev.edge_count()
         } else {
@@ -431,32 +417,16 @@ fn merge_edges<T: CoordinateType + Debug>(edge: Edge<T>,
         match e.polygon_type {
             PolygonType::Subject => {
                 sum_subject += e.edge_weight();
-                // last_subject = match last_subject {
-                //     None => Some(e),
-                //     Some(last) => {
-                //         // last and e cancel out.
-                //         e.set_edge_type(EdgeType::NonContributing);
-                //         last.set_edge_type(EdgeType::NonContributing);
-                //         None
-                //     }
-                // };
                 if let Some(last) = last_subject {
+                    // Deactivate the previous edge. At most one edge will remain.
                     last.set_edge_type(EdgeType::NonContributing);
                 }
                 last_subject = Some(e);
             }
             PolygonType::Clipping => {
                 sum_clipping += e.edge_weight();
-                // last_clipping = match last_clipping {
-                //     None => Some(e),
-                //     Some(last) => {
-                //         // last and e cancel out.
-                //         e.set_edge_type(EdgeType::NonContributing);
-                //         last.set_edge_type(EdgeType::NonContributing);
-                //         None
-                //     }
-                // };
                 if let Some(last) = last_clipping {
+                    // Deactivate the previous edge. At most one edge will remain.
                     last.set_edge_type(EdgeType::NonContributing);
                 }
                 last_clipping = Some(e);
