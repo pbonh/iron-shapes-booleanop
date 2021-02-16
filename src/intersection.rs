@@ -39,6 +39,7 @@ use std::cmp::Ordering;
 use itertools::Itertools;
 use std::usize;
 use num_integer::Integer;
+use crate::PolygonSemantics;
 
 /// Insert the edges of the polygons into the event queue.
 fn fill_queue<'a, T, S, C>(subject: S,
@@ -58,6 +59,10 @@ fn fill_queue<'a, T, S, C>(subject: S,
 //                let edge_id = edge_ids.next().unwrap();
                 let edge_id = usize::MAX;
                 let event_a_is_left = edge.start < edge.end;
+
+                // Upper boundary edges are directed from right to left.
+                let is_upper_boundary = edge.end < edge.start;
+
                 let event_a = SweepEvent::new_rc(
                     edge_id,
                     edge.start,
@@ -65,6 +70,7 @@ fn fill_queue<'a, T, S, C>(subject: S,
                     Weak::new(),
                     polygon_type,
                     EdgeType::Normal,
+                    is_upper_boundary,
                 );
                 let event_b = SweepEvent::new_rc(
                     edge_id,
@@ -73,6 +79,7 @@ fn fill_queue<'a, T, S, C>(subject: S,
                     Rc::downgrade(&event_a),
                     polygon_type,
                     EdgeType::Normal,
+                    is_upper_boundary,
                 );
 
 
@@ -116,20 +123,40 @@ pub fn compute_fields<T>(event: &Rc<SweepEvent<T>>,
     if let Some(prev) = maybe_prev {
         let is_same_type = event.polygon_type == prev.polygon_type;
 
-        let upper_boundary = match (event.is_vertical(), is_same_type) {
-            (false, false) => !prev.is_outside_other(),
-            (false, true) => !prev.is_upper_boundary(),
+        // let upper_boundary = match (event.is_vertical(), is_same_type) {
+        //     (false, false) => !prev.other_edge_count(),
+        //     (false, true) => !prev.edge_count(),
+        //
+        //     (true, false) => prev.other_edge_count(),
+        //     (true, true) => prev.edge_count(),
+        // };
+        //
+        // let is_outside_other = match is_same_type {
+        //     false => prev.edge_count(),
+        //     true => prev.other_edge_count(),
+        // };
 
-            (true, false) => prev.is_outside_other(),
-            (true, true) => prev.is_upper_boundary(),
+
+        let edge_count = if is_same_type {
+            prev.edge_count()
+        } else {
+            prev.other_edge_count()
         };
 
-        let is_outside_other = match is_same_type {
-            false => prev.is_upper_boundary(),
-            true => prev.is_outside_other(),
+        // Update the edge count of the current type.
+        let edge_count = if event.is_vertical() {
+            edge_count
+        } else {
+            edge_count + event.edge_weight()
         };
 
-        event.set_upper_boundary(upper_boundary, is_outside_other);
+        let other_edge_count = if is_same_type {
+            prev.other_edge_count()
+        } else {
+            prev.edge_count()
+        };
+
+        event.set_edge_count(edge_count, other_edge_count);
 
         // Remember the previous segment for contour-hole attribution.
         // Note: What matters in the end is the previous segment that also contributes to the result
@@ -138,10 +165,15 @@ pub fn compute_fields<T>(event: &Rc<SweepEvent<T>>,
     } else {
         // This is the first event in the scan line.
         if event.is_vertical() {
-            event.set_upper_boundary(true, true);
+            event.set_edge_count(0, 0); // TODO: Is this correct?
         } else {
+            // First event in the scan line, it is not vertical.
+            // Treat it as a lower boundary that is outside of the other polygon.
+
             // It is always a lower boundary and outside of the other polygon.
-            event.set_upper_boundary(false, true);
+            // debug_assert!(!event.is_upper_boundary); // Not necessarily true for instance in a hour-glass shape with a self-intersecting polygon.
+
+            event.set_edge_count(event.edge_weight(), 0);
         }
     }
 }
@@ -157,7 +189,7 @@ pub fn compute_fields<T>(event: &Rc<SweepEvent<T>>,
 /// let expected_union = Polygon::from(vec![(0., 0.), (2., 0.), (2., 1.), (3., 1.),
 ///                                                 (3., 3.), (1., 3.), (1., 2.), (0., 2.)]);
 ///
-/// let i = boolean_op(edge_intersection_float, vec![&p1], vec![&p2], Operation::Union);
+/// let i = boolean_op(edge_intersection_float, vec![&p1], vec![&p2], Operation::Union, PolygonSemantics::XOR);
 ///
 /// assert_eq!(i.len(), 1);
 /// assert_eq!(i.polygons[0], expected_union);
@@ -165,7 +197,8 @@ pub fn compute_fields<T>(event: &Rc<SweepEvent<T>>,
 pub fn boolean_op<'a, I, T, S, C>(edge_intersection: I,
                                   subject: S,
                                   clipping: C,
-                                  operation: Operation) -> MultiPolygon<T>
+                                  operation: Operation,
+                                  polygon_semantics: PolygonSemantics) -> MultiPolygon<T>
     where I: Fn(&Edge<T>, &Edge<T>) -> EdgeIntersection<T, T>,
           T: CoordinateType + Debug + 'a,
           S: IntoIterator<Item=&'a Polygon<T>>,
@@ -185,13 +218,14 @@ pub fn boolean_op<'a, I, T, S, C>(edge_intersection: I,
         edge_intersection,
         &mut event_queue,
         &mut event_id_generator,
+        polygon_semantics,
     );
 
 
-    // dbg!(&sorted_events);
+    dbg!(&sorted_events);
 
     // Connect the edges into polygons.
-    let r = connect_edges(&sorted_events, operation);
+    let r = connect_edges(&sorted_events, operation, polygon_semantics);
     MultiPolygon::new(r)
 }
 
@@ -224,6 +258,7 @@ fn subdivide_segments<T: CoordinateType + Debug, I>(
     edge_intersection: I,
     event_queue: &mut BinaryHeap<Rc<SweepEvent<T>>>,
     event_id_generator: &mut RangeFrom<usize>,
+    polygon_semantics: PolygonSemantics,
 ) -> Vec<Rc<SweepEvent<T>>>
     where I: Fn(&Edge<T>, &Edge<T>) -> EdgeIntersection<T, T> {
     let mut sorted_events = Vec::new();
@@ -354,7 +389,7 @@ fn subdivide_segments<T: CoordinateType + Debug, I>(
         .group_by(|e| e.get_edge()).into_iter()
         // Reduce each group to a single contributing edge.
         .for_each(|(edge, event_group)|
-            merge_edges(edge.unwrap(), event_group.collect())
+            merge_edges(edge.unwrap(), event_group.collect(), polygon_semantics)
         );
 
     sorted_events
@@ -369,7 +404,10 @@ fn subdivide_segments<T: CoordinateType + Debug, I>(
 /// # Parameters
 /// `edge`: An `Edge`.
 /// `events`: All events that describe an equal edge as `edge`.
-fn merge_edges<T: CoordinateType + Debug>(edge: Edge<T>, events: Vec<&Rc<SweepEvent<T>>>) -> () {
+fn merge_edges<T: CoordinateType + Debug>(edge: Edge<T>,
+                                          events: Vec<&Rc<SweepEvent<T>>>,
+                                          polygon_semantics: PolygonSemantics,
+) -> () {
     debug_assert!(&events.iter().all(|e| e.get_edge().unwrap() == edge),
                   "All group items must share the same edge.");
 
@@ -382,36 +420,72 @@ fn merge_edges<T: CoordinateType + Debug>(edge: Edge<T>, events: Vec<&Rc<SweepEv
         .map(|e| e.get_prev())
         .unwrap_or(Weak::new());
 
-    let mut last_subject = None;
-    let mut last_clipping = None;
+    let mut last_subject: Option<&Rc<SweepEvent<T>>> = None;
+    let mut sum_subject = 0;
+    let mut last_clipping: Option<&Rc<SweepEvent<T>>> = None;
+    let mut sum_clipping = 0;
 
-    for e in &events {
+    for &e in &events {
         debug_assert!(e.is_left_event());
         e.set_edge_type(EdgeType::Normal);
         match e.polygon_type {
             PolygonType::Subject => {
-                last_subject = match last_subject {
-                    None => Some(e),
-                    Some(last) => {
-                        // last and e cancel out.
-                        e.set_edge_type(EdgeType::NonContributing);
-                        last.set_edge_type(EdgeType::NonContributing);
-                        None
-                    }
+                sum_subject += e.edge_weight();
+                // last_subject = match last_subject {
+                //     None => Some(e),
+                //     Some(last) => {
+                //         // last and e cancel out.
+                //         e.set_edge_type(EdgeType::NonContributing);
+                //         last.set_edge_type(EdgeType::NonContributing);
+                //         None
+                //     }
+                // };
+                if let Some(last) = last_subject {
+                    last.set_edge_type(EdgeType::NonContributing);
                 }
+                last_subject = Some(e);
             }
             PolygonType::Clipping => {
-                last_clipping = match last_clipping {
-                    None => Some(e),
-                    Some(last) => {
-                        // last and e cancel out.
-                        e.set_edge_type(EdgeType::NonContributing);
-                        last.set_edge_type(EdgeType::NonContributing);
-                        None
-                    }
+                sum_clipping += e.edge_weight();
+                // last_clipping = match last_clipping {
+                //     None => Some(e),
+                //     Some(last) => {
+                //         // last and e cancel out.
+                //         e.set_edge_type(EdgeType::NonContributing);
+                //         last.set_edge_type(EdgeType::NonContributing);
+                //         None
+                //     }
+                // };
+                if let Some(last) = last_clipping {
+                    last.set_edge_type(EdgeType::NonContributing);
                 }
+                last_clipping = Some(e);
             }
         }
+    }
+
+    let is_last_subject_contributing = match polygon_semantics {
+        PolygonSemantics::Union => sum_subject != 0,
+        PolygonSemantics::XOR => sum_subject % 2 != 0
+    };
+
+    let is_last_clipping_contributing = match polygon_semantics {
+        PolygonSemantics::Union => sum_clipping != 0,
+        PolygonSemantics::XOR => sum_clipping % 2 != 0
+    };
+
+    if !is_last_clipping_contributing {
+        if let Some(last) = last_clipping {
+            last.set_edge_type(EdgeType::NonContributing);
+        }
+        last_clipping = None;
+    }
+
+    if !is_last_subject_contributing{
+        if let Some(last) = last_subject {
+            last.set_edge_type(EdgeType::NonContributing);
+        }
+        last_subject = None;
     }
 
     if let (Some(s), Some(c)) = (last_subject, last_clipping) {
@@ -419,7 +493,7 @@ fn merge_edges<T: CoordinateType + Debug>(edge: Edge<T>, events: Vec<&Rc<SweepEv
         // The `outside` flag does not matter to the `connect_edge` stage in this case.
         s.set_edge_type(EdgeType::NonContributing);
         c.set_edge_type(
-            match s.is_upper_boundary() == c.is_upper_boundary() {
+            match s.is_upper_boundary(polygon_semantics) == c.is_upper_boundary(polygon_semantics) {
                 false => EdgeType::DifferentTransition,
                 true => EdgeType::SameTransition
             }
@@ -445,15 +519,15 @@ fn merge_edges<T: CoordinateType + Debug>(edge: Edge<T>, events: Vec<&Rc<SweepEv
         match (last_subject, last_clipping) {
             (Some(edge), None) | (None, Some(edge)) => {
                 // Count how many edges of the other polygon type appear before the remaining edge.
-                let num_other_edges = &events.iter()
+                let sum_other_edges: i32 = events.iter()
                     .take_while(|e| !Rc::ptr_eq(edge, e))
                     .filter(|e| e.polygon_type != edge.polygon_type)
-                    .count();
+                    .map(|e| e.edge_weight())
+                    .sum();
 
-                let flip_outside_flag = num_other_edges % 2 == 1;
-                // Now flip the outside flag.
-                edge.set_upper_boundary(edge.is_upper_boundary(),
-                                        edge.is_outside_other() ^ flip_outside_flag);
+                // Update the edge count.
+                edge.set_edge_count(edge.edge_count(),
+                                    edge.other_edge_count() - sum_other_edges);
             }
             _ => ()
         }
@@ -492,6 +566,7 @@ mod test {
 //            &[&p1],
 //            &[&p2],
 //            Operation::Intersection,
+// PolygonSemantics::XOR
 //        );
 //        println!("{:?}", i);
 //        assert_eq!(i.len(), 1);
@@ -523,7 +598,9 @@ mod test {
                                                 (3, 3), (1, 3), (1, 2), (0, 2)]);
 
         let i = boolean_op(
-            edge_intersection_integer, &[p1], &[p2], Operation::Union);
+            edge_intersection_integer, &[p1], &[p2],
+            Operation::Union,
+            PolygonSemantics::XOR);
 
         assert_eq!(i.len(), 1);
         assert_eq!(i.polygons[0], expected_union);
@@ -534,8 +611,47 @@ mod test {
         let p1 = Polygon::from(vec![(0., 0.), (2., 0.), (2., 2.)]);
 
         let i = boolean_op(
-            edge_intersection_float, vec![&p1], vec![&p1], Operation::Union);
+            edge_intersection_float, vec![&p1], vec![&p1], Operation::Union,
+            PolygonSemantics::XOR);
 
+        assert_eq!(i.len(), 1);
+        assert_eq!(&i.polygons[0], &p1);
+    }
+
+
+    #[test]
+    fn test_boolean_op_duplicate_union_semantics() {
+
+        // Use the same polygon multiple times as a subject or clipping polygon.
+        // Union semantics should reduce multiple overlapping polygons into one polygon.
+
+        let p1 = Polygon::from(vec![(0., 0.), (2., 0.), (2., 2.)]);
+
+        let i = boolean_op(
+            edge_intersection_float, vec![], vec![&p1, &p1],
+            Operation::Union,
+            PolygonSemantics::Union);
+        assert_eq!(i.len(), 1);
+        assert_eq!(&i.polygons[0], &p1);
+
+        let i = boolean_op(
+            edge_intersection_float, vec![&p1, &p1], vec![],
+            Operation::Union,
+            PolygonSemantics::Union);
+        assert_eq!(i.len(), 1);
+        assert_eq!(&i.polygons[0], &p1);
+
+        let i = boolean_op(
+            edge_intersection_float, vec![&p1, &p1], vec![&p1, &p1],
+            Operation::Union,
+            PolygonSemantics::Union);
+        assert_eq!(i.len(), 1);
+        assert_eq!(&i.polygons[0], &p1);
+
+        let i = boolean_op(
+            edge_intersection_float, vec![&p1, &p1, &p1, &p1, &p1], vec![&p1, &p1, &p1],
+            Operation::Union,
+            PolygonSemantics::Union);
         assert_eq!(i.len(), 1);
         assert_eq!(&i.polygons[0], &p1);
     }
@@ -545,19 +661,25 @@ mod test {
         let p1 = Polygon::from(vec![(0., 0.), (2., 0.), (2., 2.)]);
 
         let i = boolean_op(
-            edge_intersection_float, vec![&p1], vec![&p1], Operation::Xor);
+            edge_intersection_float, vec![&p1], vec![&p1],
+            Operation::Xor,
+            PolygonSemantics::XOR);
 
         assert_eq!(i.len(), 0);
 
         let i = boolean_op(
-            edge_intersection_float, vec![&p1, &p1], vec![&p1], Operation::Xor);
+            edge_intersection_float, vec![&p1, &p1], vec![&p1],
+            Operation::Xor,
+            PolygonSemantics::XOR);
 
         assert_eq!(i.len(), 1);
         assert_eq!(&i.polygons[0], &p1);
 
 
         let i = boolean_op(
-            edge_intersection_float, vec![&p1], vec![&p1, &p1], Operation::Xor);
+            edge_intersection_float, vec![&p1], vec![&p1, &p1],
+            Operation::Xor,
+            PolygonSemantics::XOR);
 
         assert_eq!(i.len(), 1);
         assert_eq!(&i.polygons[0], &p1);
@@ -575,6 +697,7 @@ mod test {
             &[big_square],
             &[little_square_inside, little_square_outside],
             Operation::Xor,
+            PolygonSemantics::XOR,
         );
 
         assert!(i.polygons.iter().any(|p| p.interiors.len() == 1));
@@ -597,6 +720,7 @@ mod test {
             vec![&square1],
             vec![&square2],
             Operation::Xor,
+            PolygonSemantics::XOR,
         );
 
         let probe_points = [(0., 0.), (0.5, 0.5), (1., 1.), (1.5, 1.5), (2.5, 2.5)];
@@ -720,6 +844,7 @@ mod test {
             vec![&a],
             vec![&b],
             Operation::Intersection,
+            PolygonSemantics::XOR,
         );
 
         let expected = Polygon::from(vec![rp(1, 0), rp(5, 0),
@@ -746,6 +871,7 @@ mod test {
             vec![&a],
             vec![&b],
             Operation::Intersection,
+            PolygonSemantics::XOR,
         );
 
         dbg!(&result);
@@ -771,6 +897,7 @@ mod test {
             vec![&a],
             vec![&b],
             Operation::Intersection,
+            PolygonSemantics::XOR,
         );
 
         let expected = Polygon::from(vec![p(2, 0), p(10, 0),
@@ -802,6 +929,7 @@ mod test {
             vec![&a],
             vec![&b],
             Operation::Intersection,
+            PolygonSemantics::XOR,
         );
 
         dbg!(&result);
@@ -829,6 +957,7 @@ edge_intersection_rational,
 vec![&a],
 vec![&b],
 Operation::Intersection,
+PolygonSemantics::XOR,
         );
 
         let expected = Polygon::from(vec![p(4, 4), p(11, 11),
@@ -873,6 +1002,7 @@ Operation::Intersection,
                     vec![&a],
                     vec![&b],
                     operation,
+                    PolygonSemantics::XOR,
                 )).collect();
 
 

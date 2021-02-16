@@ -70,7 +70,8 @@ fn divide_segment<T>(event: &Rc<SweepEvent<T>>,
             false,
             Rc::downgrade(&event),
             event.polygon_type,
-            EdgeType::Normal);
+            EdgeType::Normal,
+            event.is_upper_boundary);
 
         let l = SweepEvent::new_rc(
             event.get_edge_id(),
@@ -79,6 +80,7 @@ fn divide_segment<T>(event: &Rc<SweepEvent<T>>,
             Rc::downgrade(&other_event),
             event.polygon_type,
             EdgeType::Normal,
+            event.is_upper_boundary,
         );
 
         debug_assert!(event.p <= r.p);

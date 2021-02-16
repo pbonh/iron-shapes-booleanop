@@ -28,6 +28,7 @@ use std::fmt::Debug;
 use iron_shapes::polygon::Polygon;
 use iron_shapes::point::Point;
 use iron_shapes::simple_polygon::SimplePolygon;
+use crate::PolygonSemantics;
 
 #[derive(Debug, Clone, PartialEq)]
 struct Event<T: CoordinateType> {
@@ -69,18 +70,20 @@ struct Event<T: CoordinateType> {
 
 
 /// Check if the event contributes to the result.
-fn contributes_to_result<T>(event: &SweepEvent<T>, operation: Operation) -> bool
+fn contributes_to_result<T>(event: &SweepEvent<T>,
+                            operation: Operation,
+                            polygon_semantics: PolygonSemantics) -> bool
     where T: CoordinateType,
 {
     debug_assert!(event.is_left_event());
     // TODO: check correctness.
     match event.get_edge_type() {
         EdgeType::Normal => match operation {
-            Operation::Intersection => !event.is_outside_other(),
-            Operation::Union => event.is_outside_other(),
+            Operation::Intersection => !event.is_outside_other(polygon_semantics),
+            Operation::Union => event.is_outside_other(polygon_semantics),
             Operation::Difference => match event.polygon_type {
-                PolygonType::Subject => event.is_outside_other(),
-                PolygonType::Clipping => !event.is_outside_other()
+                PolygonType::Subject => event.is_outside_other(polygon_semantics),
+                PolygonType::Clipping => !event.is_outside_other(polygon_semantics)
             }
             Operation::Xor => true,
         },
@@ -103,7 +106,9 @@ fn contributes_to_result<T>(event: &SweepEvent<T>, operation: Operation) -> bool
 /// Take all the events that contribute to the result.
 /// This depends on the boolean operation to be performed.
 /// Also adjusts the `prev` pointers for hole attribution.
-fn filter_events<T>(sorted_events: &[Rc<SweepEvent<T>>], operation: Operation) -> Vec<Rc<SweepEvent<T>>>
+fn filter_events<T>(sorted_events: &[Rc<SweepEvent<T>>],
+                    operation: Operation,
+                    polygon_semantics: PolygonSemantics) -> Vec<Rc<SweepEvent<T>>>
     where
         T: CoordinateType + Debug,
 {
@@ -114,10 +119,10 @@ fn filter_events<T>(sorted_events: &[Rc<SweepEvent<T>>], operation: Operation) -
         event.set_pos(i);
 
         let contributes_to_result = if event.is_left_event() {
-            contributes_to_result(event, operation)
+            contributes_to_result(event, operation, polygon_semantics)
         } else {
             event.get_other_event().map(|other|
-                contributes_to_result(other.as_ref(), operation))
+                contributes_to_result(other.as_ref(), operation, polygon_semantics))
                 .unwrap_or(false)
         };
 
@@ -153,7 +158,7 @@ fn filter_events<T>(sorted_events: &[Rc<SweepEvent<T>>], operation: Operation) -
 
 /// Sort the events and insert indices.
 /// Input events must already be filtered such that they only contain relevant events.
-fn order_events<T>(events: &mut Vec<Rc<SweepEvent<T>>>) -> Vec<Event<T>>
+fn order_events<T>(events: &mut Vec<Rc<SweepEvent<T>>>, polygon_semantics: PolygonSemantics) -> Vec<Event<T>>
     where
         T: CoordinateType,
 {
@@ -209,7 +214,7 @@ fn order_events<T>(events: &mut Vec<Rc<SweepEvent<T>>>) -> Vec<Event<T>>
                     .map(|p| p.get_pos()),
                 p: event.p,
                 is_left_event: event.is_left_event(),
-                is_hull: event.is_outside_other(),
+                is_hull: event.is_outside_other(polygon_semantics),
                 polygon_type: event.polygon_type,
                 contour_id: usize::max_value(),
             }
@@ -264,13 +269,15 @@ fn next_index<T: CoordinateType>(events: &[Event<T>],
 /// This uses the property events at the same point lie next to each other in the list
 /// of sorted events. This way it is easy to follow the contour: 1) Start at some left event,
 /// 2) go to its right event, 3) from there find a event with the same location.
-pub fn connect_edges<T>(sorted_events: &[Rc<SweepEvent<T>>], operation: Operation) -> Vec<Polygon<T>>
+pub fn connect_edges<T>(sorted_events: &[Rc<SweepEvent<T>>],
+                        operation: Operation,
+                        polygon_semantics: PolygonSemantics) -> Vec<Polygon<T>>
     where
         T: CoordinateType + Debug,
 {
-    let mut relevant_events = filter_events(sorted_events, operation);
+    let mut relevant_events = filter_events(sorted_events, operation, polygon_semantics);
 
-    let mut events = order_events(&mut relevant_events);
+    let mut events = order_events(&mut relevant_events, polygon_semantics);
 
     debug_assert!(events.len() % 2 == 0, "Expect an even number of events.");
 

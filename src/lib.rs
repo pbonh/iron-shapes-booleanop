@@ -86,32 +86,32 @@ pub enum PolygonSemantics {
     /// A point `p` is inside the polygon if the winding number is larger than `0`.
     Union,
     /// A point `p` is inside the polygon if the winding number modulo 2 is larger than `0`.
-    XOR
+    XOR,
 }
 
 /// Trait for geometric primitives that support boolean operations.
 pub trait BooleanOp<T: CoordinateType> {
     /// Compute the boolean operation of `self` and `other`.
-    fn boolean_op(&self, operation: Operation, other: &Self) -> MultiPolygon<T>;
+    fn boolean_op(&self, operation: Operation, other: &Self, polygon_semantics: PolygonSemantics) -> MultiPolygon<T>;
 
     /// Compute the boolean intersection `self & other`.
     fn intersection(&self, other: &Self) -> MultiPolygon<T> {
-        self.boolean_op(Operation::Intersection, other)
+        self.boolean_op(Operation::Intersection, other, PolygonSemantics::XOR)
     }
 
     /// Compute the boolean difference `self - other`.
     fn difference(&self, other: &Self) -> MultiPolygon<T> {
-        self.boolean_op(Operation::Difference, other)
+        self.boolean_op(Operation::Difference, other, PolygonSemantics::XOR)
     }
 
     /// Compute the boolean union `self | other`.
     fn union(&self, other: &Self) -> MultiPolygon<T> {
-        self.boolean_op(Operation::Union, other)
+        self.boolean_op(Operation::Union, other, PolygonSemantics::XOR)
     }
 
     /// Compute the boolean exclusive OR `self ^ other`.
     fn xor(&self, other: &Self) -> MultiPolygon<T> {
-        self.boolean_op(Operation::Xor, other)
+        self.boolean_op(Operation::Xor, other, PolygonSemantics::XOR)
     }
 }
 
@@ -119,7 +119,8 @@ pub trait BooleanOp<T: CoordinateType> {
 macro_rules! impl_booleanop_multipolygon {
  ($coord:ty, $edge_intersection:ident) => {
      impl BooleanOp<$coord> for MultiPolygon<$coord> {
-        fn boolean_op(&self, operation: Operation, other: &Self) -> MultiPolygon<$coord> {
+        fn boolean_op(&self, operation: Operation, other: &Self, polygon_semantics: PolygonSemantics)
+         -> MultiPolygon<$coord> {
             let subject = self.polygons.iter();
             let clipping = other.polygons.iter();
             boolean_op(
@@ -127,6 +128,7 @@ macro_rules! impl_booleanop_multipolygon {
                 subject,
                 clipping,
                 operation,
+                polygon_semantics
             )
         }
     }
@@ -146,7 +148,8 @@ impl_booleanop_multipolygon!(Rational, edge_intersection_rational);
 macro_rules! impl_booleanop_polygon {
  ($coord:ty, $edge_intersection:ident) => {
      impl BooleanOp<$coord> for Polygon<$coord> {
-        fn boolean_op(&self, operation: Operation, other: &Self) -> MultiPolygon<$coord> {
+        fn boolean_op(&self, operation: Operation, other: &Self, polygon_semantics: PolygonSemantics)
+        -> MultiPolygon<$coord> {
             let subject = std::iter::once(self);
             let clipping = std::iter::once(other);
             boolean_op(
@@ -154,6 +157,7 @@ macro_rules! impl_booleanop_polygon {
                 subject,
                 clipping,
                 operation,
+                polygon_semantics
             )
         }
     }

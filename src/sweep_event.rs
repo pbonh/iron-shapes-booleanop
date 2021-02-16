@@ -24,6 +24,7 @@ use iron_shapes::edge::{Edge, Side};
 use iron_shapes::CoordinateType;
 
 use std::cmp::Ordering;
+use crate::PolygonSemantics;
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum PolygonType {
@@ -53,12 +54,14 @@ struct MutablePart<T: CoordinateType> {
     prev: Weak<SweepEvent<T>>,
     /// Is p the left endpoint of the edge (p, other.p)?
     is_left_event: bool,
-    /// Is this an upper boundary of this polygon?
-    upper_boundary: bool,
+    /// Counts the parity of all edges of the same polygon type (clipping/subject) below this edge.
+    /// Lower boundaries are counted as 1, upper boundaries are counted as -1.
+    edge_count: i32,
+    /// Counts the parity of all edges of the other polygon type (clipping/subject) below this edge.
+    /// Lower boundaries are counted as 1, upper boundaries are counted as -1.
+    other_edge_count: i32,
     ///
     edge_type: EdgeType,
-    /// Is this event outside of the other polygon?
-    is_outside_other: bool,
     /// Index of this event in an array.
     pos: usize,
     /// Unique ID of the edge. Used to break ties and guarantee ordering for overlapping edges.
@@ -73,6 +76,8 @@ pub struct SweepEvent<T: CoordinateType> {
     pub p: Point<T>,
     /// Type of polygon: either SUBJECT or CLIPPING.
     pub polygon_type: PolygonType,
+    /// Is this edge an upper boundary of the polygon?
+    pub is_upper_boundary: bool,
 }
 
 
@@ -85,20 +90,22 @@ impl<T: CoordinateType> SweepEvent<T> {
         other_event: Weak<SweepEvent<T>>,
         polygon_type: PolygonType,
         edge_type: EdgeType,
+        is_upper_boundary: bool,
     ) -> Rc<SweepEvent<T>> {
         Rc::new(SweepEvent {
             mutable: RefCell::new(MutablePart {
                 other_event,
                 prev: Weak::new(),
                 is_left_event,
-                upper_boundary: false,
+                edge_count: 0,
                 edge_type,
-                is_outside_other: false,
+                other_edge_count: 0,
                 pos: 0,
                 edge_id,
             }),
             p: point,
             polygon_type,
+            is_upper_boundary,
         })
     }
 
@@ -160,21 +167,39 @@ impl<T: CoordinateType> SweepEvent<T> {
         self.mutable.borrow_mut().edge_type = edge_type
     }
 
-    pub fn is_upper_boundary(&self) -> bool {
-        self.mutable.borrow().upper_boundary
+    pub fn edge_count(&self) -> i32 {
+        self.mutable.borrow().edge_count
     }
 
 
     /// Is this event outside of the other polygon?
-    pub fn is_outside_other(&self) -> bool {
-        self.mutable.borrow().is_outside_other
+    pub fn other_edge_count(&self) -> i32 {
+        self.mutable.borrow().other_edge_count
     }
 
-    pub fn set_upper_boundary(&self, upper_boundary: bool, is_outside_other: bool) {
+    pub fn set_edge_count(&self, edge_count: i32, other_edge_count: i32) {
         let mut mutable = self.mutable.borrow_mut();
 
-        mutable.upper_boundary = upper_boundary;
-        mutable.is_outside_other = is_outside_other;
+        mutable.edge_count = edge_count;
+        mutable.other_edge_count = other_edge_count;
+    }
+
+    /// Check if this event lies outside the other polygon.
+    pub fn is_outside_other(&self, polygon_semantics: PolygonSemantics) -> bool {
+        let edge_count = self.other_edge_count();
+        match polygon_semantics {
+            PolygonSemantics::Union => edge_count == 0,
+            PolygonSemantics::XOR => edge_count % 2 == 0
+        }
+    }
+
+    /// Check if the edge that belongs to this event is an upper boundary of this polygon.
+    pub fn is_upper_boundary(&self, polygon_semantics: PolygonSemantics) -> bool {
+        let edge_count = self.edge_count();
+        match polygon_semantics {
+            PolygonSemantics::Union => edge_count == 0,
+            PolygonSemantics::XOR => edge_count % 2 == 0
+        }
     }
 
     pub fn get_pos(&self) -> usize {
@@ -210,12 +235,21 @@ impl<T: CoordinateType> SweepEvent<T> {
     pub fn set_prev(&self, prev: Weak<SweepEvent<T>>) {
         self.mutable.borrow_mut().prev = prev;
     }
+
+    /// Lower boundaries have a weight `1`, upper boundaries have a weight `-1`.
+    pub fn edge_weight(&self) -> i32 {
+        if self.is_upper_boundary {
+            -1
+        } else {
+            1
+        }
+    }
 }
 
 impl<'a, T> PartialEq for SweepEvent<T>
     where T: CoordinateType {
     fn eq(&self, other: &Self) -> bool {
-        self.p == other.p
+        self.cmp(other) == Ordering::Equal
     }
 }
 
@@ -270,8 +304,13 @@ impl<'a, T> Ord for SweepEvent<T>
                             }
                             Side::Center => {
                                 debug_assert!(edge1.is_collinear(&edge2));
-                                // Break the tie by the polygon type and then the edge_id.
-                                other.get_edge_id().cmp(&self.get_edge_id())
+                                // // Break the tie by the polygon type and then the edge_id.
+                                // other.get_edge_id().cmp(&self.get_edge_id())
+
+                                // Take lower boundaries before upper boundaries, break the tie by the edge_id.
+                                other.is_upper_boundary.cmp(&self.is_upper_boundary)
+                                    .then_with(|| other.get_edge_id().cmp(&self.get_edge_id()))
+
                             }
                         }
                     }
@@ -297,6 +336,7 @@ mod test {
             Weak::new(),
             PolygonType::Subject,
             EdgeType::Normal,
+            false,
         );
         let right = SweepEvent::new_rc(
             0,
@@ -305,6 +345,7 @@ mod test {
             Weak::new(),
             PolygonType::Subject,
             EdgeType::Normal,
+            false,
         );
 
         assert!(right > left);
@@ -319,6 +360,7 @@ mod test {
             Weak::new(),
             PolygonType::Subject,
             EdgeType::Normal,
+            false,
         );
         let upper = SweepEvent::new_rc(
             0,
@@ -327,6 +369,7 @@ mod test {
             Weak::new(),
             PolygonType::Subject,
             EdgeType::Normal,
+            false,
         );
 
         assert!(lower > upper);

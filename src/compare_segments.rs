@@ -100,9 +100,10 @@ pub fn compare_events_by_segments<T>(le1: &Rc<SweepEvent<T>>,
 //       TODO: if edge1.is_collinear_approx(edge2, tolerance) {
     if edge1.is_collinear(&edge2) {
         // Segments are collinear, thus they intersect the scan line in the same point.
-        // Break the tie by the edge_id.
+        // Take lower boundaries before upper boundaries, break the tie by the edge_id.
 
-        le1.get_edge_id().cmp(&le2.get_edge_id())
+        le1.is_upper_boundary.cmp(&le2.is_upper_boundary)
+            .then_with(|| le1.get_edge_id().cmp(&le2.get_edge_id()))
     } else {
         // Segments are not collinear.
 
@@ -162,6 +163,7 @@ mod test {
             Weak::new(),
             polygon_type,
             EdgeType::Normal,
+            false
         );
         let event = SweepEvent::new_rc(
             event_id,
@@ -170,6 +172,7 @@ mod test {
             Rc::downgrade(&other),
             polygon_type,
             EdgeType::Normal,
+            false
         );
         other.set_other_event(&event);
 
