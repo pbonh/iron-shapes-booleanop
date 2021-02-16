@@ -1,6 +1,6 @@
 [package]
 name = "iron-shapes-booleanop"
-version = "0.0.0"
+version = "0.0.1"
 authors = ["Thomas Kramer <code@tkramer.ch>"]
 edition = "2018"
 license = "AGPLv3"
@@ -15,4 +15,4 @@ iron-shapes = {path = "../iron-shapes"}
 libreda-splay = {path = "../splay"}
 
 [dev-dependencies]
-rand = "0.7"
+rand = "0.7" # For randomized tests.
