@@ -122,7 +122,7 @@ pub fn compute_fields<T>(event: &Rc<SweepEvent<T>>,
 {
     if let Some(prev) = maybe_prev {
         let is_same_type = event.polygon_type == prev.polygon_type;
-        
+
         let edge_count = if is_same_type {
             prev.edge_count()
         } else {
@@ -151,7 +151,7 @@ pub fn compute_fields<T>(event: &Rc<SweepEvent<T>>,
     } else {
         // This is the first event in the scan line.
         if event.is_vertical() {
-            event.set_edge_count(0, 0); // TODO: Is this correct?
+            event.set_edge_count(0, 0);
         } else {
             // First event in the scan line, it is not vertical.
             // Treat it as a lower boundary that is outside of the other polygon.
@@ -206,9 +206,6 @@ pub fn boolean_op<'a, I, T, S, C>(edge_intersection: I,
         &mut event_id_generator,
         polygon_semantics,
     );
-
-
-    dbg!(&sorted_events);
 
     // Connect the edges into polygons.
     let r = connect_edges(&sorted_events, operation, polygon_semantics);
