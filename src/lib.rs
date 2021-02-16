@@ -71,7 +71,7 @@ pub enum Operation {
     Xor,
 }
 
-/// Define the 'inside' of a polygon.
+/// Define the 'inside' of a polygon. Significant for self-overlapping polygons.
 ///
 /// * `Union`: A point `p` is inside the polygon if the winding number is larger than `0`.
 /// This means that if a polygon overlaps with itself or multiple polygons overlap, the overlapping
@@ -92,26 +92,41 @@ pub enum PolygonSemantics {
 /// Trait for geometric primitives that support boolean operations.
 pub trait BooleanOp<T: CoordinateType> {
     /// Compute the boolean operation of `self` and `other`.
+    ///
+    /// # Parameters
+    ///
+    /// * `operation`: The type of boolean operation to be computed (intersection, union, difference, XOR).
+    /// * `other`: The other operand. A geometric object of the same type as `self`.
+    /// * `polygon_semantics`: Define the 'inside' of a polygon. In case of doubt `Union`-semantics
+    /// could be a good choice.
     fn boolean_op(&self, operation: Operation, other: &Self, polygon_semantics: PolygonSemantics) -> MultiPolygon<T>;
 
     /// Compute the boolean intersection `self & other`.
+    ///
+    /// Union semantics are used for self-overlapping polygons.
     fn intersection(&self, other: &Self) -> MultiPolygon<T> {
-        self.boolean_op(Operation::Intersection, other, PolygonSemantics::XOR)
+        self.boolean_op(Operation::Intersection, other, PolygonSemantics::Union)
     }
 
     /// Compute the boolean difference `self - other`.
+    ///
+    /// Union semantics are used for self-overlapping polygons.
     fn difference(&self, other: &Self) -> MultiPolygon<T> {
-        self.boolean_op(Operation::Difference, other, PolygonSemantics::XOR)
+        self.boolean_op(Operation::Difference, other, PolygonSemantics::Union)
     }
 
     /// Compute the boolean union `self | other`.
+    ///
+    /// Union semantics are used for self-overlapping polygons.
     fn union(&self, other: &Self) -> MultiPolygon<T> {
-        self.boolean_op(Operation::Union, other, PolygonSemantics::XOR)
+        self.boolean_op(Operation::Union, other, PolygonSemantics::Union)
     }
 
     /// Compute the boolean exclusive OR `self ^ other`.
+    ///
+    /// Union semantics are used for self-overlapping polygons.
     fn xor(&self, other: &Self) -> MultiPolygon<T> {
-        self.boolean_op(Operation::Xor, other, PolygonSemantics::XOR)
+        self.boolean_op(Operation::Xor, other, PolygonSemantics::Union)
     }
 }
 
