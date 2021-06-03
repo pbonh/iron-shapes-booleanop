@@ -306,6 +306,33 @@ mod test {
     }
 
     #[test]
+    fn test_multipolygon_intersection() {
+        // Intersection of a vertical stripe with two horizontal stripes.
+        // This used to trigger a bug: Polygons where falsely recognized as holes.
+
+        let p = |a: isize, b: isize| Point::new(a, b);
+
+        let horizontal_stripe = Polygon::from(vec![p(0, 0), p(10, 0), p(10, 1), p(0, 1)]);
+        let vertical_stripe = Polygon::from(vec![p(0, -1), p(1, -1), p(1, 11), p(0, 11)]);
+        let horizontal_stripe2 = horizontal_stripe.translate((0, 4).into());
+
+        let result = boolean_op(
+            edge_intersection_integer,
+            vec![&horizontal_stripe, &horizontal_stripe2],
+            vec![&vertical_stripe],
+            Operation::Intersection,
+            PolygonSemantics::Union,
+        );
+
+        // assert_eq!(result.len(), 2);
+
+        for p in result.polygons {
+            dbg!(&p);
+            assert_eq!(p.interiors.len(), 0)
+        }
+    }
+
+    #[test]
     fn test_vertical_degenerate_polygon() {
         // The edges on the x-axis are collinear and overlap.
 

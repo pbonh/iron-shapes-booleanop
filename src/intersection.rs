@@ -146,7 +146,7 @@ pub fn compute_fields<T>(event: &Rc<SweepEvent<T>>,
 
         // Remember the previous segment for contour-hole attribution.
         // Note: What matters in the end is the previous segment that also contributes to the result
-        // Hence there is post-processing necessary.
+        // Hence there is post-processing necessary (done in `connect_edges::filter_events()`).
         event.set_prev(Rc::downgrade(prev));
     } else {
         // This is the first event in the scan line.
@@ -207,9 +207,12 @@ pub fn boolean_op<'a, I, T, S, C>(edge_intersection: I,
         polygon_semantics,
     );
 
+    // dbg!(&sorted_events);
+    // dbg!(sorted_events.len());
+
     // Connect the edges into polygons.
     let r = connect_edges(&sorted_events, operation, polygon_semantics);
-    MultiPolygon::new(r)
+    MultiPolygon::from_polygons(r)
 }
 
 

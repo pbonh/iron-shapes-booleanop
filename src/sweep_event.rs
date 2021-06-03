@@ -76,7 +76,7 @@ pub struct SweepEvent<T: CoordinateType> {
     pub p: Point<T>,
     /// Type of polygon: either SUBJECT or CLIPPING.
     pub polygon_type: PolygonType,
-    /// Is this edge an upper boundary of the polygon?
+    /// Is this edge an upper boundary of the input polygon?
     pub is_upper_boundary: bool,
 }
 

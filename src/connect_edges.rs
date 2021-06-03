@@ -40,7 +40,10 @@ struct Event<T: CoordinateType> {
     prev_index: Option<usize>,
     /// The endpoint of the edge which is represented by this event.
     p: Point<T>,
-    is_hull: bool,
+    /// Is this part of a hole? Used to distinguish between holes and hulls.
+    is_hole: bool,
+    /// Is this an upper boundary of the contour? Used to distinguish between holes and hulls.
+    is_upper_boundary: bool,
     /// Tells if this is the left or right event of the segment.
     is_left_event: bool,
     polygon_type: PolygonType,
@@ -128,7 +131,7 @@ fn filter_events<T>(sorted_events: &[Rc<SweepEvent<T>>],
 
         contributes[i] = contributes_to_result;
 
-        // Update the prev field for hole attrubution.
+        // Update the prev field for hole attribution.
         if let Some(prev) = event.get_prev().upgrade() {
             if !contributes[prev.get_pos()] {
                 // The previous event is not contributing to the result, so take the previous
@@ -158,7 +161,7 @@ fn filter_events<T>(sorted_events: &[Rc<SweepEvent<T>>],
 
 /// Sort the events and insert indices.
 /// Input events must already be filtered such that they only contain relevant events.
-fn order_events<T>(events: &mut Vec<Rc<SweepEvent<T>>>, polygon_semantics: PolygonSemantics) -> Vec<Event<T>>
+fn order_events<T>(events: &mut Vec<Rc<SweepEvent<T>>>) -> Vec<Event<T>>
     where
         T: CoordinateType,
 {
@@ -214,7 +217,8 @@ fn order_events<T>(events: &mut Vec<Rc<SweepEvent<T>>>, polygon_semantics: Polyg
                     .map(|p| p.get_pos()),
                 p: event.p,
                 is_left_event: event.is_left_event(),
-                is_hull: event.is_outside_other(polygon_semantics),
+                is_hole: false,
+                is_upper_boundary: false,
                 polygon_type: event.polygon_type,
                 contour_id: usize::max_value(),
             }
@@ -277,7 +281,7 @@ pub fn connect_edges<T>(sorted_events: &[Rc<SweepEvent<T>>],
 {
     let mut relevant_events = filter_events(sorted_events, operation, polygon_semantics);
 
-    let mut events = order_events(&mut relevant_events, polygon_semantics);
+    let mut events = order_events(&mut relevant_events);
 
     debug_assert!(events.len() % 2 == 0, "Expect an even number of events.");
 
@@ -325,7 +329,21 @@ pub fn connect_edges<T>(sorted_events: &[Rc<SweepEvent<T>>],
         let initial_event = &events[i];
 
         // Find contour index if this is a hole.
-        let polygon_id = if initial_event.is_hull {
+
+        let is_hull = initial_event.prev_index
+            .map(|prev| {
+                let prev_event = &events[prev];
+                if prev_event.is_upper_boundary {
+                    !prev_event.is_hole
+                } else {
+                    // A hole inside a hole is a hull.
+                    prev_event.is_hole
+                }
+            })
+            .unwrap_or(true);
+        let is_hole = !is_hull;
+
+        let polygon_id = if is_hull {
             polygons.len()
         } else {
             initial_event.prev_index
@@ -340,9 +358,24 @@ pub fn connect_edges<T>(sorted_events: &[Rc<SweepEvent<T>>],
 
         // Follow the lines until the contour is closed.
         loop {
-            events[pointer].contour_id = polygon_id;
-            let other_pointer = events[pointer].other_index;
-            events[other_pointer].contour_id = polygon_id;
+            let other_pointer = {
+                let e = &mut events[pointer];
+                e.contour_id = polygon_id;
+                e.is_hole = is_hole;
+                e.other_index
+            };
+            {
+                let other = &mut events[other_pointer];
+                other.contour_id = polygon_id;
+                other.is_hole = is_hole;
+            }
+
+            if events[pointer].p.x > events[other_pointer].p.x {
+                // This is an upper boundary of the contour.
+                events[pointer].is_upper_boundary = true;
+                events[other_pointer].is_upper_boundary = true;
+            }
+
             let event = &events[pointer];
             let other_event = &events[other_pointer];
 
@@ -369,7 +402,6 @@ pub fn connect_edges<T>(sorted_events: &[Rc<SweepEvent<T>>],
         if polygon_id < polygons.len() {
             // Add hole to existing polygon.
             polygons[polygon_id].interiors.push(SimplePolygon::new(contour));
-            println!("Insert hole.");
         } else {
             polygons.push(Polygon::new(contour));
         }

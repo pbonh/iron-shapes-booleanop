@@ -171,7 +171,7 @@ pub fn possible_intersection<F, I>(
         }
         EdgeIntersection::EndPoint(p) => {
             debug_assert!(edge1.start == p || edge1.end == p || edge2.start == p || edge2.end == p,
-                          "`p` is expected to be an end-point.");
+                          "`p` is expected to be an end-point but is not.");
 
 //                println!("EndPoint p = {:?}", p);
 
