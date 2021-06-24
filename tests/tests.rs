@@ -27,7 +27,7 @@ mod test {
     use iron_shapes_booleanop::*;
     use iron_shapes::prelude::*;
     use iron_shapes::traits::{Translate, Scale};
-    use num_rational::Rational;
+    use num_rational::Rational64;
     use self::rand::distributions::{Uniform, Distribution};
     use self::rand::rngs::StdRng;
     use self::rand::SeedableRng;
@@ -231,8 +231,8 @@ mod test {
     fn test_rational_collinear_edge() {
         // The edges on the x-axis are collinear and overlap.
 
-        let rp = |a: isize, b: isize| Point::new(Rational::from(a), Rational::from(b));
-        let r = |a: isize, b: isize| Rational::new(a, b);
+        let rp = |a: i64, b: i64| Point::new(Rational64::from(a), Rational64::from(b));
+        let r = |a: i64, b: i64| Rational64::new(a, b);
 
         let a = Polygon::from(vec![rp(0, 0), rp(5, 0), rp(3, 1)]);
         let b = Polygon::from(vec![rp(1, 0), rp(5, 0), rp(3, 2)]);
@@ -255,9 +255,9 @@ mod test {
     fn test_rational_collinear_edge_2() {
         // The edges on the x-axis are collinear and overlap.
 
-        let rp = |a: isize, b: isize| Point::new(Rational::from(a), Rational::from(b));
-//        let rp = |a: isize, b: isize| Point::new(a, b);
-        let r = |a: isize, b: isize| Rational::new(a, b);
+        let rp = |a: i64, b: i64| Point::new(Rational64::from(a), Rational64::from(b));
+//        let rp = |a: i64, b: i64| Point::new(a, b);
+        let r = |a: i64, b: i64| Rational64::new(a, b);
 
         let scale = r(1, 1);
         let a = Polygon::from(vec![rp(3, 2), rp(7, 6), rp(2, 5)]).scale(scale);
@@ -285,7 +285,7 @@ mod test {
     fn test_integer_collinear_edge() {
         // The edges on the x-axis are collinear and overlap.
 
-        let p = |a: isize, b: isize| Point::new(a, b);
+        let p = |a: i64, b: i64| Point::new(a, b);
 
         let a = Polygon::from(vec![p(0, 0), p(10, 0), p(6, 2)]);
         let b = Polygon::from(vec![p(2, 0), p(10, 0), p(6, 4)]);
@@ -310,7 +310,7 @@ mod test {
         // Intersection of a vertical stripe with two horizontal stripes.
         // This used to trigger a bug: Polygons where falsely recognized as holes.
 
-        let p = |a: isize, b: isize| Point::new(a, b);
+        let p = |a: i64, b: i64| Point::new(a, b);
 
         let horizontal_stripe = Polygon::from(vec![p(0, 0), p(10, 0), p(10, 1), p(0, 1)]);
         let vertical_stripe = Polygon::from(vec![p(0, -1), p(1, -1), p(1, 11), p(0, 11)]);
@@ -336,8 +336,8 @@ mod test {
     fn test_vertical_degenerate_polygon() {
         // The edges on the x-axis are collinear and overlap.
 
-        let p = |a: isize, b: isize| Point::new(Rational::from(a), Rational::from(b));
-//        let p = |a: isize, b: isize| Point::new(a, b);
+        let p = |a: i64, b: i64| Point::new(Rational64::from(a), Rational64::from(b));
+//        let p = |a: i64, b: i64| Point::new(a, b);
 
 
         let a = Polygon::from(vec![p(0, 0), p(0, 2)]);
@@ -366,12 +366,12 @@ mod test {
     fn test_rational_collinear_edge3() {
         // The edges on the x-axis are collinear and overlap.
 
-//        let p = |a: isize, b: isize| Point::new(a, b);
-        let p = |a: isize, b: isize| Point::new(Rational::from(a), Rational::from(b));
+//        let p = |a: i64, b: i64| Point::new(a, b);
+        let p = |a: i64, b: i64| Point::new(Rational64::from(a), Rational64::from(b));
 
         // Some random translation
-//        let t = Point::new(Rational::new(100, 7), Rational::new(5, 23));
-        let t = Vector::new(Rational::new(0, 1), Rational::new(0, 1));
+//        let t = Point::new(Rational64::new(100, 7), Rational64::new(5, 23));
+        let t = Vector::new(Rational64::new(0, 1), Rational64::new(0, 1));
 
         let a = Polygon::from(vec![p(0, 0), p(11, 11), p(4, 8)]).translate(t);
         let b = Polygon::from(vec![p(4, 4), p(11, 11), p(1, 10)]).translate(t);
@@ -398,16 +398,16 @@ PolygonSemantics::XOR,
         let seed1 = [seed + 0; 32];
         let seed2 = [seed + 1; 32];
 
-        assert!(Rational::new(1, 2) == Rational::new(2, 4));
+        assert!(Rational64::new(1, 2) == Rational64::new(2, 4));
 
         let max_coordinate = 4;
         let between = Uniform::from(0..max_coordinate);
         let mut rng = StdRng::from_seed(seed1);
 
-        let mut rand_polygon = |n_points: usize| -> Polygon<Rational> {
+        let mut rand_polygon = |n_points: usize| -> Polygon<Rational64> {
             let points: Vec<_> = (0..n_points).into_iter()
-                .map(|_| (Rational::new(between.sample(&mut rng), 1),
-                          Rational::new(between.sample(&mut rng), 1)))
+                .map(|_| (Rational64::new(between.sample(&mut rng), 1),
+                          Rational64::new(between.sample(&mut rng), 1)))
                 .collect();
 
             Polygon::new(&points)
@@ -439,8 +439,8 @@ PolygonSemantics::XOR,
 
             // Create random probe points.
             let probe_points = (0..num_probe_points).into_iter()
-                .map(|_| (Rational::new(between.sample(&mut rng), denominator),
-                          Rational::new(between.sample(&mut rng), denominator)));
+                .map(|_| (Rational64::new(between.sample(&mut rng), denominator),
+                          Rational64::new(between.sample(&mut rng), denominator)));
 
             let mut num_checks = 0usize;
             for p in probe_points {

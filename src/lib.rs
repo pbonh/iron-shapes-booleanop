@@ -56,7 +56,7 @@ pub use intersection::{edge_intersection_float, edge_intersection_integer, edge_
 use iron_shapes::CoordinateType;
 use iron_shapes::multi_polygon::MultiPolygon;
 use iron_shapes::polygon::Polygon;
-use num_rational::{Rational32, Rational, Rational64};
+use num_rational::{Rational32, Rational64};
 
 /// Type of boolean operation.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -157,7 +157,6 @@ impl_booleanop_multipolygon!(i64, edge_intersection_integer);
 
 impl_booleanop_multipolygon!(Rational32, edge_intersection_rational);
 impl_booleanop_multipolygon!(Rational64, edge_intersection_rational);
-impl_booleanop_multipolygon!(Rational, edge_intersection_rational);
 
 /// Implement the `BooleanOp` trait for `Polygon<...>`.
 macro_rules! impl_booleanop_polygon {
@@ -186,4 +185,3 @@ impl_booleanop_polygon!(i64, edge_intersection_integer);
 
 impl_booleanop_polygon!(Rational32, edge_intersection_rational);
 impl_booleanop_polygon!(Rational64, edge_intersection_rational);
-impl_booleanop_polygon!(Rational, edge_intersection_rational);

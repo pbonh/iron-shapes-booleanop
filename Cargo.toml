@@ -1,6 +1,6 @@
 [package]
 name = "iron-shapes-booleanop"
-version = "0.0.1"
+version = "0.0.2"
 authors = ["Thomas Kramer <code@tkramer.ch>"]
 edition = "2018"
 license = "AGPLv3"
@@ -9,7 +9,7 @@ description = "Boolean operations on polygons for iron-shapes."
 [dependencies]
 num-traits = "0.2"
 num-integer = "0.1"
-num-rational = "0.2"
+num-rational = "0.4"
 itertools = "0.10"
 iron-shapes = {path = "../iron-shapes"}
 libreda-splay = {path = "../splay"}
