@@ -253,7 +253,7 @@ fn subdivide_segments<T: CoordinateType + Debug, I>(
 
     let mut scan_line = SplaySet::new(compare_events_by_segments);
 
-    let mut scan_line_position = None;
+    let mut scan_line_position = None; // For sanity checks only.
 
     while let Some(event) = event_queue.pop() {
         debug_assert!(event.is_left_event() ^ event.get_other_event().unwrap().is_left_event());

@@ -405,57 +405,7 @@ pub fn connect_edges<T>(sorted_events: &[Rc<SweepEvent<T>>],
         } else {
             polygons.push(Polygon::new(contour));
         }
-//
-//        let index = polygons.iter().enumerate()
-//            .find(|(_pos, poly)|
-//                contour.iter()
-//                    .any(|&p| poly.exterior.contains_point(p))
-//            ).map(|(pos, _)| pos);
-//        if let Some(index) = index {
-//            polygons[index].interiors.push(SimplePolygon::new(contour))
-//        } else {
-//            polygons.push(Polygon::new(contour));
-//        }
 
-//        // Decide whether the found contour is a hull or a hole.
-//        if !initial_event.is_hull {
-//            if polygons.is_empty() {
-//                polygons.push(Polygon::new(contour));
-//            } else {
-//                // TODO
-//            }
-//        } else if operation == Operation::Difference
-//            && initial_event.polygon_type == PolygonType::Clipping {
-//            debug_assert!(polygons.len() > 1, "Expect to already have a hull polygon.");
-//            // This is a hole.
-//            // TODO
-//        } else {
-//            // This is an exterior contour of a polygon.
-//            polygons.push(Polygon::new(contour));
-//        }
-
-
-//        if !events[i].is_hull {
-//            if result.is_empty() {
-//                result.push(Polygon::new(contour));
-//            } else {
-//                result
-//                    .last_mut()
-//                    .expect("Result must not be empty at this point")
-//                    .interiors
-//                    .push(SimplePolygon::new(contour));
-//            }
-//        } else if operation == Operation::Difference
-//            && events[i].polygon_type == PolygonType::Clipping
-//            && result.len() > 1 {
-//            result
-//                .last_mut()
-//                .expect("Result must not be empty at this point")
-//                .interiors
-//                .push(SimplePolygon::new(contour));
-//        } else {
-//            result.push(Polygon::new(contour));
-//        }
     }
 
     polygons

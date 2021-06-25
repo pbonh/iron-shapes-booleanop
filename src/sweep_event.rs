@@ -63,6 +63,7 @@ struct MutablePart<T: CoordinateType> {
     ///
     edge_type: EdgeType,
     /// Index of this event in an array.
+    /// In a later step of the algorithm this will hold the index of the other event.
     pos: usize,
     /// Unique ID of the edge. Used to break ties and guarantee ordering for overlapping edges.
     edge_id: usize,
