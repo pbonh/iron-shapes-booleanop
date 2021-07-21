@@ -90,7 +90,6 @@ fn fill_queue<'a, T, S, C>(subject: S,
             }
         }
     }
-    ;
 
     // Subject polygons.
     for p in subject {
