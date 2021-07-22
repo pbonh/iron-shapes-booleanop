@@ -32,8 +32,11 @@ pub enum PolygonType {
     Clipping,
 }
 
+/// Define the type of contribution of an edge to the final result.
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum EdgeType {
+    /// An edge that does not overlap with any other and contributes to the final result.
+    /// That's the default.
     Normal,
     /// No contribution to the result.
     NonContributing,
