@@ -37,7 +37,6 @@ use std::fmt::Debug;
 use std::ops::RangeFrom;
 use std::cmp::Ordering;
 use itertools::Itertools;
-use std::usize;
 use num_integer::Integer;
 use crate::PolygonSemantics;
 
