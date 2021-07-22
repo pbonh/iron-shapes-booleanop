@@ -63,7 +63,7 @@ struct MutablePart<T: CoordinateType> {
     /// Counts the parity of all edges of the other polygon type (clipping/subject) below this edge.
     /// Lower boundaries are counted as 1, upper boundaries are counted as -1.
     other_edge_count: i32,
-    ///
+    /// Tell how the edge contributes to the final result.
     edge_type: EdgeType,
     /// Index of this event in an array.
     /// In a later step of the algorithm this will hold the index of the other event.
