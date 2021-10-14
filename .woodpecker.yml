@@ -1,6 +1,0 @@
-pipeline:
-    build:
-        image: rust
-        commands:
-            - cargo check
-            - cargo test
