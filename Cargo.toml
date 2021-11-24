@@ -3,7 +3,7 @@ name = "iron-shapes-booleanop"
 version = "0.0.2"
 authors = ["Thomas Kramer <code@tkramer.ch>"]
 edition = "2018"
-license = "AGPLv3"
+license = "AGPL-3.0-or-later"
 description = "Boolean operations on polygons for iron-shapes."
 
 [dependencies]
