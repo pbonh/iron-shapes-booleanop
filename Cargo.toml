@@ -11,8 +11,8 @@ num-traits = "0.2"
 num-integer = "0.1"
 num-rational = "0.4"
 itertools = "0.10"
-iron-shapes = {path = "../iron-shapes"}
-libreda-splay = {path = "../splay"}
+iron-shapes = {version = "0.0.7", path = "../iron-shapes"}
+libreda-splay = {version = "0.1", path = "../splay"}
 
 [dev-dependencies]
 rand = "0.8" # For randomized tests.

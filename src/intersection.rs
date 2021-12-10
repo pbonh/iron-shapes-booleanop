@@ -55,7 +55,7 @@ fn fill_queue<'a, T, S, C>(subject: S,
         for edge in poly.edges() {
             // Skip degenerate edges.
             if !edge.is_degenerate() {
-//                let edge_id = edge_ids.next().unwrap();
+
                 let edge_id = usize::MAX;
                 let event_a_is_left = edge.start < edge.end;
 
@@ -204,9 +204,6 @@ pub fn boolean_op<'a, I, T, S, C>(edge_intersection: I,
         &mut event_id_generator,
         polygon_semantics,
     );
-
-    // dbg!(&sorted_events);
-    // dbg!(sorted_events.len());
 
     // Connect the edges into polygons.
     let r = connect_edges(&sorted_events, operation, polygon_semantics);
