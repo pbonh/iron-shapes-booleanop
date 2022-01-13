@@ -401,11 +401,11 @@ pub fn connect_edges<T>(sorted_events: &[Rc<SweepEvent<T>>],
         }
         if polygon_id < polygons.len() {
             // Add hole to existing polygon.
-            polygons[polygon_id].interiors.push(SimplePolygon::new(contour));
+            let hole = SimplePolygon::new(contour).normalized_orientation::<T>();
+            polygons[polygon_id].interiors.push(hole);
         } else {
             polygons.push(Polygon::new(contour));
         }
-
     }
 
     polygons
