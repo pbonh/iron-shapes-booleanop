@@ -183,7 +183,7 @@ pub fn boolean_op<'a, I, T, S, C>(edge_intersection: I,
                                   clipping: C,
                                   operation: Operation,
                                   polygon_semantics: PolygonSemantics) -> MultiPolygon<T>
-    where I: Fn(&Edge<T>, &Edge<T>) -> EdgeIntersection<T, T>,
+    where I: Fn(&Edge<T>, &Edge<T>) -> EdgeIntersection<T, T, Edge<T>>,
           T: CoordinateType + Debug + 'a,
           S: IntoIterator<Item=&'a Polygon<T>>,
           C: IntoIterator<Item=&'a Polygon<T>>,
@@ -212,14 +212,14 @@ pub fn boolean_op<'a, I, T, S, C>(edge_intersection: I,
 
 
 /// Compute approximate intersection point of two edges in floating point coordinates.
-pub fn edge_intersection_float<F: Float>(e1: &Edge<F>, e2: &Edge<F>) -> EdgeIntersection<F, F> {
+pub fn edge_intersection_float<F: Float>(e1: &Edge<F>, e2: &Edge<F>) -> EdgeIntersection<F, F, Edge<F>> {
     e1.edge_intersection_approx(e2, F::from(1e-8).unwrap())
 }
 
 /// Compute the intersection of edges with rational coordinates.
 /// In rational coordinates intersections can be computed exactly.
 pub fn edge_intersection_rational<T>(e1: &Edge<Ratio<T>>, e2: &Edge<Ratio<T>>)
-                                     -> EdgeIntersection<Ratio<T>, Ratio<T>>
+                                     -> EdgeIntersection<Ratio<T>, Ratio<T>, Edge<Ratio<T>>>
     where T: CoordinateType + Integer {
     e1.edge_intersection_rational(e2)
 }
@@ -227,7 +227,7 @@ pub fn edge_intersection_rational<T>(e1: &Edge<Ratio<T>>, e2: &Edge<Ratio<T>>)
 /// Compute intersection of edges in integer coordinates.
 /// For edges that are parallel to the x or y axis the intersection can be computed exactly.
 /// For others it will be rounded.
-pub fn edge_intersection_integer<T: PrimInt + Debug>(e1: &Edge<T>, e2: &Edge<T>) -> EdgeIntersection<T, T> {
+pub fn edge_intersection_integer<T: PrimInt + Debug>(e1: &Edge<T>, e2: &Edge<T>) -> EdgeIntersection<T, T, Edge<T>> {
     e1.edge_intersection_rounded(e2)
 }
 
@@ -241,7 +241,7 @@ fn subdivide_segments<T: CoordinateType + Debug, I>(
     event_id_generator: &mut RangeFrom<usize>,
     polygon_semantics: PolygonSemantics,
 ) -> Vec<Rc<SweepEvent<T>>>
-    where I: Fn(&Edge<T>, &Edge<T>) -> EdgeIntersection<T, T> {
+    where I: Fn(&Edge<T>, &Edge<T>) -> EdgeIntersection<T, T, Edge<T>> {
     let mut sorted_events = Vec::new();
     // Reserve the minimum amount of storage necessary.
     sorted_events.reserve(event_queue.len());

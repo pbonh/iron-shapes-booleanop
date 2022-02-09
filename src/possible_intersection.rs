@@ -125,7 +125,7 @@ pub fn possible_intersection<F, I>(
 ) -> ()
     where
         F: CoordinateType + Debug,
-        I: Fn(&Edge<F>, &Edge<F>) -> EdgeIntersection<F, F>
+        I: Fn(&Edge<F>, &Edge<F>) -> EdgeIntersection<F, F, Edge<F>>
 {
     debug_assert!(event1.is_left_event());
     debug_assert!(event2.is_left_event());

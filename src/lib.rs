@@ -50,13 +50,13 @@ mod compare_segments;
 mod connect_edges;
 mod possible_intersection;
 
+use num_rational::{Rational32, Rational64};
+
 // API exports.
 pub use intersection::boolean_op;
 pub use intersection::{edge_intersection_float, edge_intersection_integer, edge_intersection_rational};
-use iron_shapes::CoordinateType;
-use iron_shapes::multi_polygon::MultiPolygon;
-use iron_shapes::polygon::Polygon;
-use num_rational::{Rational32, Rational64};
+
+use iron_shapes::prelude::{CoordinateType, Polygon, MultiPolygon, Point, EdgeIntersection};
 
 /// Type of boolean operation.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -149,6 +149,7 @@ macro_rules! impl_booleanop_multipolygon {
     }
  }
 }
+
 
 impl_booleanop_multipolygon!(f32, edge_intersection_float);
 impl_booleanop_multipolygon!(f64, edge_intersection_float);
