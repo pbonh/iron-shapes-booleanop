@@ -34,7 +34,7 @@ mod test {
 
     #[test]
     fn test_boolean_op_simple() {
-        // Union of two well formed rectlinear polygons.
+        // Union of two well formed rectilinear polygons.
 
         let p1 = Polygon::from(vec![(0., 0.), (2., 0.), (2., 2.), (0., 2.)]);
         let p2 = p1.translate((1., 1.).into());
