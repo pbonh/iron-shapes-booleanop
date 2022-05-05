@@ -56,7 +56,7 @@ use num_rational::{Rational32, Rational64};
 pub use intersection::boolean_op;
 pub use intersection::{edge_intersection_float, edge_intersection_integer, edge_intersection_rational};
 
-use iron_shapes::prelude::{CoordinateType, Polygon, MultiPolygon, Point, EdgeIntersection};
+use iron_shapes::prelude::{CoordinateType, Polygon, MultiPolygon};
 
 /// Type of boolean operation.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]

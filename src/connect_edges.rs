@@ -79,9 +79,10 @@ fn contributes_to_result<T>(event: &SweepEvent<T>,
     where T: CoordinateType,
 {
     debug_assert!(event.is_left_event());
-    // TODO: check correctness.
-    match event.get_edge_type() {
-        EdgeType::Normal => match operation {
+
+    event.is_outer_boundary(polygon_semantics)
+        &&
+        match operation {
             Operation::Intersection => !event.is_outside_other(polygon_semantics),
             Operation::Union => event.is_outside_other(polygon_semantics),
             Operation::Difference => match event.polygon_type {
@@ -89,21 +90,34 @@ fn contributes_to_result<T>(event: &SweepEvent<T>,
                 PolygonType::Clipping => !event.is_outside_other(polygon_semantics)
             }
             Operation::Xor => true,
-        },
-        // If the edge is a result of a overlapping intersection:
-        // Same bounds (upper, upper) or (lower, lower):
-        EdgeType::SameTransition => match operation {
-            Operation::Intersection => true,
-            Operation::Union => true,
-            _ => false
-        },
-        // Opposite bounds.
-        EdgeType::DifferentTransition => match operation {
-            Operation::Difference => true,
-            _ => false
-        },
-        EdgeType::NonContributing => false,
-    }
+        }
+
+    // TODO: check correctness.
+    // event.is_outer_boundary(polygon_semantics)
+    //     && match event.get_edge_type() {
+    //     EdgeType::Normal => match operation {
+    //         Operation::Intersection => !event.is_outside_other(polygon_semantics),
+    //         Operation::Union => event.is_outside_other(polygon_semantics),
+    //         Operation::Difference => match event.polygon_type {
+    //             PolygonType::Subject => event.is_outside_other(polygon_semantics),
+    //             PolygonType::Clipping => !event.is_outside_other(polygon_semantics)
+    //         }
+    //         Operation::Xor => true,
+    //     },
+    //     // If the edge is a result of a overlapping intersection:
+    //     // Same bounds (upper, upper) or (lower, lower):
+    //     EdgeType::SameTransition => match operation {
+    //         Operation::Intersection => true,
+    //         Operation::Union => true,
+    //         _ => false
+    //     },
+    //     // Opposite bounds.
+    //     EdgeType::DifferentTransition => match operation {
+    //         Operation::Difference => true,
+    //         _ => false
+    //     },
+    //     EdgeType::NonContributing => false,
+    // }
 }
 
 /// Take all the events that contribute to the result.
@@ -112,8 +126,7 @@ fn contributes_to_result<T>(event: &SweepEvent<T>,
 fn filter_events<T>(sorted_events: &[Rc<SweepEvent<T>>],
                     operation: Operation,
                     polygon_semantics: PolygonSemantics) -> Vec<Rc<SweepEvent<T>>>
-    where
-        T: CoordinateType + Debug,
+    where T: CoordinateType + Debug,
 {
     // Flags that tell whether the event contributes to the result or not.
     let mut contributes = vec![false; sorted_events.len()];
@@ -157,6 +170,71 @@ fn filter_events<T>(sorted_events: &[Rc<SweepEvent<T>>],
         .cloned()
         .collect();
     result_events
+}
+
+/// Remove duplicate edges which would form empty polygons.
+fn xor_cancel_double_edges<T>(sorted_events: Vec<Rc<SweepEvent<T>>>) -> Vec<Rc<SweepEvent<T>>>
+    where T: CoordinateType + Debug {
+    // Flags that tell whether the event contributes to the result or not.
+    let mut contributes = vec![false; sorted_events.len()];
+
+    // Store positions.
+    for (i, event) in sorted_events.iter().enumerate() {
+        event.set_pos(i);
+    }
+
+    let mut prev_edge = None;
+    let mut prev_idx = 0;
+    for (i, event) in sorted_events.iter().enumerate() {
+        let other_idx = event.get_other_event().unwrap().get_pos();
+
+        if event.is_left_event() {
+            let edge = event.get_edge();
+
+            if Some(edge) == prev_edge {
+                // Duplicate edges cancel eachother.
+                prev_edge = None;
+                contributes[i] = false;
+                contributes[other_idx] = false; // Cancel the right event.
+
+                // Also cancel the first edge.
+                contributes[prev_idx] = false;
+                let prev_other_idx = sorted_events[prev_idx].get_other_event().unwrap().get_pos();
+                contributes[prev_other_idx] = false; // Cancel the right event.
+            } else {
+                prev_edge = Some(edge);
+                prev_idx = i;
+                contributes[i] = true;
+                contributes[other_idx] = true;
+            };
+        }
+    }
+
+    // Update the prev field for hole attribution.
+    for event in sorted_events.iter() {
+        if let Some(prev) = event.get_prev().upgrade() {
+            if !contributes[prev.get_pos()] {
+                // The previous event is not contributing to the result, so take the previous
+                // of the previous.
+                event.set_prev(prev.get_prev());
+                debug_assert!({
+                    // If the `prev` is set now, it must be a contributing edge.
+                    if let Some(prevprev) = event.get_prev().upgrade() {
+                        contributes[prevprev.get_pos()]
+                    } else {
+                        true
+                    }
+                });
+            }
+        }
+    }
+
+    // Filter relevant events.
+    sorted_events.into_iter()
+        .zip(contributes)
+        .filter(|(_e, contributes)| *contributes)
+        .map(|(e, _)| e)
+        .collect()
 }
 
 /// Sort the events and insert indices.
@@ -218,9 +296,9 @@ fn order_events<T>(events: &mut Vec<Rc<SweepEvent<T>>>) -> Vec<Event<T>>
                 p: event.p,
                 is_left_event: event.is_left_event(),
                 is_hole: false,
-                is_upper_boundary: false,
+                is_upper_boundary: false, // TODO: Is this used?
                 polygon_type: event.polygon_type,
-                contour_id: usize::max_value(),
+                contour_id: usize::MAX,
             }
         }
         ).collect();
@@ -279,7 +357,37 @@ pub fn connect_edges<T>(sorted_events: &[Rc<SweepEvent<T>>],
     where
         T: CoordinateType + Debug,
 {
+    // println!("all edges:");
+    // for e in sorted_events {
+    //     if e.is_left_event() {
+    //         println!("{:?},\touter={:?}, upper={:?}, type={:?}, outside_other={:?}",
+    //                  e.get_edge_left_right(),
+    //                  e.is_outer_boundary(polygon_semantics),
+    //                  e.is_upper_boundary(polygon_semantics),
+    //                  e.get_edge_type(),
+    //                  e.is_outside_other(polygon_semantics)
+    //         );
+    //     }
+    // }
+
     let mut relevant_events = filter_events(sorted_events, operation, polygon_semantics);
+
+    if operation == Operation::Xor || polygon_semantics == PolygonSemantics::XOR {
+        relevant_events = xor_cancel_double_edges(relevant_events);
+    }
+
+    // println!("relevant:");
+    // for e in &relevant_events {
+    //     if e.is_left_event() {
+    //         println!("{:?},\touter={:?}, upper={:?}, type={:?}, outside_other={:?}",
+    //                  e.get_edge_left_right(),
+    //                  e.is_outer_boundary(polygon_semantics),
+    //                  e.is_upper_boundary(polygon_semantics),
+    //                  e.get_edge_type(),
+    //                  e.is_outside_other(polygon_semantics)
+    //         );
+    //     }
+    // }
 
     let mut events = order_events(&mut relevant_events);
 
@@ -399,12 +507,15 @@ pub fn connect_edges<T>(sorted_events: &[Rc<SweepEvent<T>>],
                 break;
             }
         }
+
+
         if polygon_id < polygons.len() {
             // Add hole to existing polygon.
             let hole = SimplePolygon::new(contour).normalized_orientation::<T>();
             polygons[polygon_id].interiors.push(hole);
         } else {
-            polygons.push(Polygon::new(contour));
+            let p = Polygon::new(contour);
+            polygons.push(p);
         }
     }
 

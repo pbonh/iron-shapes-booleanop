@@ -55,7 +55,6 @@ fn fill_queue<'a, T, S, C>(subject: S,
         for edge in poly.edges() {
             // Skip degenerate edges.
             if !edge.is_degenerate() {
-
                 let edge_id = usize::MAX;
                 let event_a_is_left = edge.start < edge.end;
 
@@ -114,11 +113,14 @@ fn fill_queue<'a, T, S, C>(subject: S,
 
 /// Compute flags and fields for a segment based on its predecessor in the scan line (if there is one).
 pub fn compute_fields<T>(event: &Rc<SweepEvent<T>>,
-                         maybe_prev: Option<&Rc<SweepEvent<T>>>)
+                         maybe_prev: Option<&Rc<SweepEvent<T>>>,
+                         polygon_semantics: PolygonSemantics)
     where
         T: CoordinateType,
 {
     if let Some(prev) = maybe_prev {
+        debug_assert_eq!(event.is_left_event(), prev.is_left_event());
+
         let is_same_type = event.polygon_type == prev.polygon_type;
 
         let edge_count = if is_same_type {
@@ -128,11 +130,7 @@ pub fn compute_fields<T>(event: &Rc<SweepEvent<T>>,
         };
 
         // Update the edge count of the current type.
-        let edge_count = if event.is_vertical() {
-            edge_count
-        } else {
-            edge_count + event.edge_weight()
-        };
+        let edge_count = edge_count + event.edge_weight();
 
         let other_edge_count = if is_same_type {
             prev.other_edge_count()
@@ -146,19 +144,80 @@ pub fn compute_fields<T>(event: &Rc<SweepEvent<T>>,
         // Note: What matters in the end is the previous segment that also contributes to the result
         // Hence there is post-processing necessary (done in `connect_edges::filter_events()`).
         event.set_prev(Rc::downgrade(prev));
+
+        // if event.p == prev.p && prev.get_edge_type() != EdgeType::NonContributing {
+        //     // Handle collinear edges.
+        //
+        //     let edge1 = event.get_edge().unwrap();
+        //     let edge2 = prev.get_edge().unwrap();
+        //     let is_collinear = edge1 == edge2;
+        //
+        //     // let is_same_transition = event.is_upper_boundary(polygon_semantics) == prev.is_upper_boundary(polygon_semantics);
+        //     let is_same_transition = event.is_upper_boundary == prev.is_upper_boundary;
+        //
+        //     if is_collinear {
+        //
+        //         dbg!(is_same_type);
+        //         dbg!(is_same_transition);
+        //         if is_same_type {
+        //
+        //             // Deactivate prev.
+        //             // Current event inherits fields from prev.
+        //             event.set_edge_type(prev.get_edge_type());
+        //             event.set_edge_count(prev.edge_count(), prev.other_edge_count());
+        //             event.set_prev(prev.get_prev());
+        //
+        //             match polygon_semantics {
+        //                 PolygonSemantics::Union => {
+        //                     if is_same_transition {
+        //                         // Only prev cancels out.
+        //                         // event.set_edge_type(EdgeType::Normal);
+        //                     } else {
+        //                         // Both edges cancel out.
+        //                         event.set_edge_type(EdgeType::NonContributing);
+        //                     }
+        //                 }
+        //                 PolygonSemantics::XOR => {
+        //                     if prev.get_edge_type() == EdgeType::Normal {
+        //                         // Both edges cancel out.
+        //                         event.set_edge_type(EdgeType::NonContributing);
+        //                     }
+        //                 }
+        //             }
+        //
+        //             // Deactivate prev.
+        //             prev.set_edge_type(EdgeType::NonContributing);
+        //         } else {
+        //             // Subject polygon edges come before clipping polygon edges.
+        //             debug_assert_eq!(event.polygon_type, PolygonType::Clipping);
+        //             debug_assert_eq!(prev.polygon_type, PolygonType::Subject);
+        //
+        //             // event.set_edge_count(prev.other_edge_count(), prev.edge_count());
+        //
+        //             let is_same_transition = event.is_upper_boundary(polygon_semantics) == prev.is_upper_boundary(polygon_semantics);
+        //             if is_same_transition {
+        //                 event.set_edge_type(EdgeType::SameTransition);
+        //                 prev.set_edge_type(EdgeType::NonContributing);
+        //             } else {
+        //                 event.set_edge_type(EdgeType::DifferentTransition);
+        //                 prev.set_edge_type(EdgeType::NonContributing);
+        //             }
+        //
+        //             event.set_prev(prev.get_prev());
+        //         }
+        //     }
+        // }
+
     } else {
         // This is the first event in the scan line.
-        if event.is_vertical() {
-            event.set_edge_count(0, 0);
-        } else {
-            // First event in the scan line, it is not vertical.
-            // Treat it as a lower boundary that is outside of the other polygon.
+        // First event in the scan line, it is not vertical.
+        // Treat it as a lower boundary that is outside of the other polygon.
 
-            // It is always a lower boundary and outside of the other polygon.
-            // debug_assert!(!event.is_upper_boundary); // Not necessarily true for instance in a hour-glass shape with a self-intersecting polygon.
+        // It is always a lower boundary and outside of the other polygon.
+        // debug_assert!(!event.is_upper_boundary); // Not necessarily true for instance in a hour-glass shape with a self-intersecting polygon.
 
-            event.set_edge_count(event.edge_weight(), 0);
-        }
+        // Verticals have an edge weight of 0.
+        event.set_edge_count(event.edge_weight(), 0);
     }
 }
 
@@ -274,25 +333,27 @@ fn subdivide_segments<T: CoordinateType + Debug, I>(
         // This is necessary in the rare case of overlapping edges the ordering
         // can be messed up.
         // Search position for the new event:
-        let len = sorted_events.len();
+        {
+            let len = sorted_events.len();
 
-        // TODO use something faster like galloping search?
-        let pos_back: isize = sorted_events.iter()
-            .rev() // Search from end of vector.
-            .find_position(|&e: &&Rc<SweepEvent<T>>| e >= &event)
-            .map(|(index, _value)| index as isize)
-            .unwrap_or(len as isize); // If nothing is found, then place it at the beginning.
+            // TODO use something faster like galloping search?
+            let pos_back: isize = sorted_events.iter()
+                .rev() // Search from end of vector.
+                .find_position(|&e: &&Rc<SweepEvent<T>>| e >= &event)
+                .map(|(index, _value)| index as isize)
+                .unwrap_or(len as isize); // If nothing is found, then place it at the beginning.
 
-        let pos = (len as isize - pos_back) as usize;
+            let pos = (len as isize - pos_back) as usize;
 
-        debug_assert_eq!(pos, sorted_events.iter()
-            .find_position(|&e: &&Rc<SweepEvent<T>>| e <= &event)
-            .map(|(index, _value)| index)
-            .unwrap_or(len)
-        );
+            debug_assert_eq!(pos, sorted_events.iter()
+                .find_position(|&e: &&Rc<SweepEvent<T>>| e <= &event)
+                .map(|(index, _value)| index)
+                .unwrap_or(len)
+            );
 
-        // Insert event at found position.
-        sorted_events.insert(pos, event.clone());
+            // Insert event at found position.
+            sorted_events.insert(pos, event.clone());
+        }
 
         if event.is_left_event() {
             debug_assert!(!scan_line.contains(&event), "Event is already in the scan line.");
@@ -311,19 +372,23 @@ fn subdivide_segments<T: CoordinateType + Debug, I>(
                 debug_assert_ne!(compare_events_by_segments(&event, prev), Ordering::Less);
             }
 
-            compute_fields(&event, maybe_prev);
+            compute_fields(&event, maybe_prev, polygon_semantics);
 
 
             if let Some(next) = maybe_next {
-                // Debug-assert that the ordering of scan line elements is correct.
-                debug_assert!(compare_events_by_segments(&event, next) != Ordering::Greater);
+                debug_assert!(
+                    compare_events_by_segments(&event, next) != Ordering::Greater,
+                    "ordering of elements in scanline is wrong"
+                );
                 possible_intersection(&edge_intersection,
                                       &event, &next, event_queue);
             }
 
             if let Some(prev) = maybe_prev {
-                // Debug-assert that the ordering of scan line elements is correct.
-                debug_assert_ne!(compare_events_by_segments(&event, prev), Ordering::Less);
+                debug_assert_ne!(
+                    compare_events_by_segments(&event, prev), Ordering::Less,
+                    "ordering of elements in scanline is wrong"
+                );
                 possible_intersection(&edge_intersection,
                                       &prev, &event, event_queue);
             }
@@ -362,16 +427,16 @@ fn subdivide_segments<T: CoordinateType + Debug, I>(
     debug_assert!(sorted_events.windows(2).all(|w| w[0] >= w[1]),
                   "Events are not sorted.");
 
-    // Merge duplicated edges.
-    (&sorted_events).into_iter()
-        // Process left events only.
-        .filter(|e| e.is_left_event())
-        // Make groups of events that have the same edge.
-        .group_by(|e| e.get_edge()).into_iter()
-        // Reduce each group to a single contributing edge.
-        .for_each(|(edge, event_group)|
-            merge_edges(edge.unwrap(), event_group.collect(), polygon_semantics)
-        );
+    // // Merge duplicated edges.
+    // (&sorted_events).into_iter()
+    //     // Process left events only.
+    //     .filter(|e| e.is_left_event())
+    //     // Make groups of events that have the same edge.
+    //     .group_by(|e| e.get_edge()).into_iter()
+    //     // Reduce each group to a single contributing edge.
+    //     .for_each(|(edge, event_group)|
+    //         merge_edges(edge.unwrap(), event_group.collect(), polygon_semantics)
+    //     );
 
     sorted_events
 }
@@ -474,7 +539,7 @@ fn merge_edges<T: CoordinateType + Debug>(edge: Edge<T>,
     // Compute the correct `outside` field for the chosen edge.
     // This is done by imagining to strip all previous edges away and update
     // the `outside` field accordingly.
-    if !edge.is_vertical() {
+    {
 
         // Compute the correct `outside` field for the chosen edge.
         // This is done by imagining to strip all previous edges away and update

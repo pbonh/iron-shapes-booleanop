@@ -26,7 +26,7 @@ use iron_shapes::CoordinateType;
 use std::cmp::Ordering;
 use crate::PolygonSemantics;
 
-#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone, Ord, PartialOrd)]
 pub enum PolygonType {
     Subject,
     Clipping,
@@ -197,12 +197,30 @@ impl<T: CoordinateType> SweepEvent<T> {
         }
     }
 
+    /// Check if the event is on an outer boundary of its polygon.
+    pub fn is_outer_boundary(&self, polygon_semantics: PolygonSemantics) -> bool {
+        match polygon_semantics {
+            PolygonSemantics::Union => self.is_upper_boundary(polygon_semantics) || self.is_lower_boundary(polygon_semantics),
+            PolygonSemantics::XOR => true
+        }
+    }
+
     /// Check if the edge that belongs to this event is an upper boundary of this polygon.
     pub fn is_upper_boundary(&self, polygon_semantics: PolygonSemantics) -> bool {
         let edge_count = self.edge_count();
         match polygon_semantics {
             PolygonSemantics::Union => edge_count == 0,
             PolygonSemantics::XOR => edge_count % 2 == 0
+        }
+    }
+
+    /// Check if the edge that belongs to this event is a lower boundary of this polygon.
+    pub fn is_lower_boundary(&self, polygon_semantics: PolygonSemantics) -> bool {
+        let edge_count = self.edge_count();
+        let w = self.edge_weight();
+        w == 1 && match polygon_semantics {
+            PolygonSemantics::Union => edge_count == 1,
+            PolygonSemantics::XOR => edge_count % 2 == 1
         }
     }
 
@@ -272,8 +290,9 @@ impl<T> PartialOrd for SweepEvent<T>
 impl<'a, T> Ord for SweepEvent<T>
     where T: CoordinateType {
     fn cmp(&self, other: &Self) -> Ordering {
-        // Note that the order is reversed because this is used in a max-heap.
-        let point_ordering = other.p.partial_cmp(&self.p).unwrap();
+        // Note that the order is reversed at the end because this is used in a max-heap.
+
+        let point_ordering = self.p.partial_cmp(&other.p).unwrap();
 
         match point_ordering {
             Ordering::Equal => {
@@ -281,7 +300,7 @@ impl<'a, T> Ord for SweepEvent<T>
 
                 // Points are equal. Break the tie!
                 // Prefer right events over left events (This is needed to efficiently connect the edges later on).
-                match other.is_left_event().cmp(&self.is_left_event()) {
+                match self.is_left_event().cmp(&other.is_left_event()) {
                     Ordering::Equal => {
 
                         // Break the tie by the edges.
@@ -300,21 +319,21 @@ impl<'a, T> Ord for SweepEvent<T>
                             // Prefer the lower edge (which has the other end point on the left side).
                             Side::Left => {
                                 debug_assert!(!edge1.is_collinear(&edge2));
-                                Ordering::Greater
+                                Ordering::Less
                             }
                             Side::Right => {
                                 debug_assert!(!edge1.is_collinear(&edge2));
-                                Ordering::Less
+                                Ordering::Greater
                             }
                             Side::Center => {
                                 debug_assert!(edge1.is_collinear(&edge2));
-                                // // Break the tie by the polygon type and then the edge_id.
-                                // other.get_edge_id().cmp(&self.get_edge_id())
 
-                                // Take lower boundaries before upper boundaries, break the tie by the edge_id.
-                                other.is_upper_boundary.cmp(&self.is_upper_boundary)
-                                    .then_with(|| other.get_edge_id().cmp(&self.get_edge_id()))
-
+                                // Subject before clipping edges,
+                                // then lower boundaries before upper boundaries
+                                // then break ties by the edge_id.
+                                self.polygon_type.cmp(&other.polygon_type)
+                                    .then_with(|| self.is_upper_boundary.cmp(&other.is_upper_boundary))
+                                    .then_with(|| self.get_edge_id().cmp(&other.get_edge_id()))
                             }
                         }
                     }
@@ -323,6 +342,7 @@ impl<'a, T> Ord for SweepEvent<T>
             }
             less_or_greater => less_or_greater
         }
+            .reverse()
     }
 }
 

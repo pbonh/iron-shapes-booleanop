@@ -100,9 +100,13 @@ pub fn compare_events_by_segments<T>(le1: &Rc<SweepEvent<T>>,
 //       TODO: if edge1.is_collinear_approx(edge2, tolerance) {
     if edge1.is_collinear(&edge2) {
         // Segments are collinear, thus they intersect the scan line in the same point.
-        // Take lower boundaries before upper boundaries, break the tie by the edge_id.
 
-        le1.is_upper_boundary.cmp(&le2.is_upper_boundary)
+        // Break the tie as follows:
+        // Subject before clipping edges,
+        // then lower boundaries before upper boundaries
+        // then break ties by the edge_id.
+        le1.polygon_type.cmp(&le2.polygon_type)
+            .then_with(|| le1.is_upper_boundary.cmp(&le2.is_upper_boundary))
             .then_with(|| le1.get_edge_id().cmp(&le2.get_edge_id()))
     } else {
         // Segments are not collinear.
@@ -116,7 +120,7 @@ pub fn compare_events_by_segments<T>(le1: &Rc<SweepEvent<T>>,
                 Side::Center => {
                     // This is collinear! Should never happen.
                     // TODO: Remove collinearity check from above (if) and put code here instead.
-                    panic!("This edges are collinear! Should not happen.");
+                    unreachable!("This edges are collinear! Should not happen.");
                 }
             }
         } else if edge1.start.x == edge2.start.x {
