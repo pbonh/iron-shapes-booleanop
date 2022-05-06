@@ -43,6 +43,12 @@
 //! let intersection = p1.xor(&p2);
 //! assert_eq!(intersection.polygons.len(), 2);
 //! ```
+//!
+//! # References
+//! * Loosely based on: F. Martinez, A. Rueda, F. Feito, "A new algorithm for computing Boolean operations on polygons", 2013, doi:10.1016/j.advengsoft.2013.04.004
+//!
+//! The algorithm implemented here deviates from the reference paper. Most notably, the ordering of lines
+//! 6-9 in Listing 2 is done differently to properly handle vertical overlapping edges.
 
 mod intersection;
 mod sweep_event;
