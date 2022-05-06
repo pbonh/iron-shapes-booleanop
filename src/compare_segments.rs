@@ -82,6 +82,9 @@ pub fn compare_events_by_segments<T>(le1: &Rc<SweepEvent<T>>,
         return Ordering::Equal;
     }
 
+
+    // let edge1 = le1.get_original_edge();
+    // let edge2 = le2.get_original_edge();
     let edge1 = le1.get_edge().unwrap();
     let edge2 = le2.get_edge().unwrap();
 
@@ -105,7 +108,8 @@ pub fn compare_events_by_segments<T>(le1: &Rc<SweepEvent<T>>,
         // Subject before clipping edges,
         // then lower boundaries before upper boundaries
         // then break ties by the edge_id.
-        le1.polygon_type.cmp(&le2.polygon_type)
+        edge1.start.partial_cmp(&edge2.start).unwrap()
+            .then_with(|| le1.polygon_type.cmp(&le2.polygon_type))
             .then_with(|| le1.is_upper_boundary.cmp(&le2.is_upper_boundary))
             .then_with(|| le1.get_edge_id().cmp(&le2.get_edge_id()))
     } else {
@@ -163,20 +167,22 @@ mod test {
         let other = SweepEvent::new_rc(
             event_id,
             right.into(),
+            left.into(),
             false,
             Weak::new(),
             polygon_type,
             EdgeType::Normal,
-            false
+            false,
         );
         let event = SweepEvent::new_rc(
             event_id,
             left.into(),
+            right.into(),
             true,
             Rc::downgrade(&other),
             polygon_type,
             EdgeType::Normal,
-            false
+            false,
         );
         other.set_other_event(&event);
 

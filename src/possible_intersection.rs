@@ -34,7 +34,7 @@ fn divide_segment<T>(event: &Rc<SweepEvent<T>>,
                      inter: Point<T>,
                      queue: &mut BinaryHeap<Rc<SweepEvent<T>>>)
     where
-        T: CoordinateType
+        T: CoordinateType + Debug
 {
     debug_assert!(event.is_left_event());
 
@@ -43,7 +43,7 @@ fn divide_segment<T>(event: &Rc<SweepEvent<T>>,
                           // Check that the point where the segment is split is really on the segment.
                           let edge = event.get_edge().unwrap();
 
-                          // Calculate area of romboid spanned by edge and intersection point.
+                          // Calculate area of rhomboid spanned by edge and intersection point.
                           let a = edge.vector();
                           let b = inter - edge.start;
                           let area = b.cross_prod(a);
@@ -67,6 +67,7 @@ fn divide_segment<T>(event: &Rc<SweepEvent<T>>,
         let r = SweepEvent::new_rc(
             event.get_edge_id(),
             inter,
+            event.p,
             false,
             Rc::downgrade(&event),
             event.polygon_type,
@@ -76,6 +77,7 @@ fn divide_segment<T>(event: &Rc<SweepEvent<T>>,
         let l = SweepEvent::new_rc(
             event.get_edge_id(),
             inter,
+            other_event.p,
             true,
             Rc::downgrade(&other_event),
             event.polygon_type,
@@ -102,8 +104,11 @@ fn divide_segment<T>(event: &Rc<SweepEvent<T>>,
         debug_assert!(event.is_left_event() ^ event.get_other_event().unwrap().is_left_event());
         debug_assert!(other_event.is_left_event() ^ other_event.get_other_event().unwrap().is_left_event());
 
+        dbg!(l.p, l.is_left_event());
+        dbg!(r.p, r.is_left_event());
         queue.push(l);
         queue.push(r);
+
     }
 }
 
@@ -112,7 +117,7 @@ fn divide_segment<T>(event: &Rc<SweepEvent<T>>,
 ///
 /// `event1` must appear before `event2` in the scan line.
 ///
-/// Returns:
+/// Returns: `true` if there was an intersection and modification to the queue.
 pub fn possible_intersection<F, I>(
     // Function to compute edge intersections.
     edge_intersection_fn: I,
@@ -122,7 +127,7 @@ pub fn possible_intersection<F, I>(
     event2: &Rc<SweepEvent<F>>,
     // Event queue.
     queue: &mut BinaryHeap<Rc<SweepEvent<F>>>,
-) -> ()
+) -> bool
     where
         F: CoordinateType + Debug,
         I: Fn(&Edge<F>, &Edge<F>) -> EdgeIntersection<F, F, Edge<F>>
@@ -145,7 +150,7 @@ pub fn possible_intersection<F, I>(
                      "Wrong ordering.");
 
     match edge_intersection_fn(&edge1, &edge2) {
-        EdgeIntersection::None => (),
+        EdgeIntersection::None => false,
         EdgeIntersection::Point(p) => {
 
 //                debug_assert!({
@@ -168,6 +173,7 @@ pub fn possible_intersection<F, I>(
 
             divide_segment(event1, p, queue);
             divide_segment(event2, p, queue);
+            true
         }
         EdgeIntersection::EndPoint(p) => {
             debug_assert!(edge1.start == p || edge1.end == p || edge2.start == p || edge2.end == p,
@@ -181,11 +187,14 @@ pub fn possible_intersection<F, I>(
             if p != edge1.start && p != edge1.end {
                 // `p` is not an endpoint of event1.
                 divide_segment(event1, p, queue);
+                true
             } else if p != edge2.start && p != edge2.end {
                 // `p` is not an endpoint of event2.
                 divide_segment(event2, p, queue);
+                true
             } else {
                 // `p` is an endpoint of both edges, therefore no edge is divided.
+                false
             }
         }
 
@@ -201,6 +210,7 @@ pub fn possible_intersection<F, I>(
             if left_coincide {
                 if right_coincide {
                     // Edges are equal. No need to split any.
+                    false
                 } else {
                     // Left points coincide but not right.
                     debug_assert!(edge1.end != edge2.end);
@@ -211,6 +221,7 @@ pub fn possible_intersection<F, I>(
                         // Split edge1 at edge2.end.
                         divide_segment(event1, edge2.end, queue)
                     }
+                    true
                 }
             } else {
                 // Edges don't have the same left point.
@@ -223,6 +234,7 @@ pub fn possible_intersection<F, I>(
                     // Split edge2 at edge1.start.
                     divide_segment(event2, edge1.start, queue);
                 }
+                true
             }
         }
     }

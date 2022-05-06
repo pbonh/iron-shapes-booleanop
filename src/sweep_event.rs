@@ -55,8 +55,6 @@ struct MutablePart<T: CoordinateType> {
     other_event: Weak<SweepEvent<T>>,
     /// Edge below this event. This is used to find polygon-hole relationships.
     prev: Weak<SweepEvent<T>>,
-    /// Is p the left endpoint of the edge (p, other.p)?
-    is_left_event: bool,
     /// Counts the parity of all edges of the same polygon type (clipping/subject) below this edge.
     /// Lower boundaries are counted as 1, upper boundaries are counted as -1.
     edge_count: i32,
@@ -68,8 +66,6 @@ struct MutablePart<T: CoordinateType> {
     /// Index of this event in an array.
     /// In a later step of the algorithm this will hold the index of the other event.
     pos: usize,
-    /// Unique ID of the edge. Used to break ties and guarantee ordering for overlapping edges.
-    edge_id: usize,
 }
 
 #[derive(Debug, Clone)]
@@ -78,10 +74,17 @@ pub struct SweepEvent<T: CoordinateType> {
     mutable: RefCell<MutablePart<T>>,
     /// Point associated with the event. Starting point or end point of the edge.
     pub p: Point<T>,
+    /// Location of the original partner event. Used in cmp().
+    pub p2_original: Point<T>,
+    /// Is p the left endpoint of the edge (p, other.p)?
+    is_left_event: bool,
     /// Type of polygon: either SUBJECT or CLIPPING.
     pub polygon_type: PolygonType,
     /// Is this edge an upper boundary of the input polygon?
     pub is_upper_boundary: bool,
+    /// Unique ID of the edge. Used to break ties and guarantee ordering for overlapping edges.
+    /// TODO: Is this necessary?
+    pub edge_id: usize,
 }
 
 
@@ -90,6 +93,7 @@ impl<T: CoordinateType> SweepEvent<T> {
     pub fn new_rc(
         edge_id: usize,
         point: Point<T>,
+        other_point: Point<T>,
         is_left_event: bool,
         other_event: Weak<SweepEvent<T>>,
         polygon_type: PolygonType,
@@ -100,26 +104,36 @@ impl<T: CoordinateType> SweepEvent<T> {
             mutable: RefCell::new(MutablePart {
                 other_event,
                 prev: Weak::new(),
-                is_left_event,
                 edge_count: 0,
                 edge_type,
                 other_edge_count: 0,
                 pos: 0,
-                edge_id,
             }),
             p: point,
+            p2_original: other_point,
+            is_left_event,
             polygon_type,
             is_upper_boundary,
+            edge_id,
         })
     }
 
     pub fn is_left_event(&self) -> bool {
-        self.mutable.borrow().is_left_event
+        self.is_left_event
     }
 
     // pub fn set_left_event(&self, left: bool) {
     //     self.mutable.borrow_mut().is_left_event = left
     // }
+
+    /// Check if the corresponding line segment is vertical.
+    pub fn is_vertical(&self) -> bool {
+        match self.get_other_event() {
+            Some(ref other_event) => self.p.x == other_event.p.x,
+            None => false,
+        }
+    }
+
 
     /// Get the event that represents the other end point of this segment.
     pub fn get_other_event(&self) -> Option<Rc<SweepEvent<T>>> {
@@ -161,6 +175,17 @@ impl<T: CoordinateType> SweepEvent<T> {
                 Edge::new(p2, p1)
             }
         })
+    }
+
+    /// Get the original edge associated with this event. Start and end point are sorted.
+    pub fn get_original_edge(&self) -> Edge<T> {
+        let edge1 = Edge::new(self.p, self.p2_original);
+
+        if edge1.start < edge1.end {
+            edge1
+        } else {
+            edge1.reversed()
+        }
     }
 
     pub fn get_edge_type(&self) -> EdgeType {
@@ -234,21 +259,13 @@ impl<T: CoordinateType> SweepEvent<T> {
 
 
     pub fn get_edge_id(&self) -> usize {
-        self.mutable.borrow().edge_id
+        self.edge_id
     }
 
-    pub fn set_edge_id(&self, edge_id: usize) {
-        self.mutable.borrow_mut().edge_id = edge_id
+    pub fn set_edge_id(&mut self, edge_id: usize) {
+        self.edge_id = edge_id
     }
 
-
-    /// Check if the corresponding line segment is vertical.
-    pub fn is_vertical(&self) -> bool {
-        match self.get_other_event() {
-            Some(ref other_event) => self.p.x == other_event.p.x,
-            None => false,
-        }
-    }
 
     pub fn get_prev(&self) -> Weak<SweepEvent<T>> {
         self.mutable.borrow().prev.clone()
@@ -300,16 +317,16 @@ impl<'a, T> Ord for SweepEvent<T>
 
                 // Points are equal. Break the tie!
                 // Prefer right events over left events (This is needed to efficiently connect the edges later on).
-                match self.is_left_event().cmp(&other.is_left_event()) {
+                match self.is_left_event.cmp(&other.is_left_event) {
                     Ordering::Equal => {
 
                         // Break the tie by the edges.
-                        let edge1 = self.get_edge_left_right().unwrap();
-                        let edge2 = other.get_edge_left_right().unwrap();
+                        let edge1 = self.get_original_edge();
+                        let edge2 = other.get_original_edge();
 
                         debug_assert!(edge1.start == edge2.start || edge1.end == edge2.end);
 
-                        let reference_point = if other.is_left_event() {
+                        let reference_point = if other.is_left_event {
                             edge2.end
                         } else {
                             edge2.start
@@ -333,7 +350,7 @@ impl<'a, T> Ord for SweepEvent<T>
                                 // then break ties by the edge_id.
                                 self.polygon_type.cmp(&other.polygon_type)
                                     .then_with(|| self.is_upper_boundary.cmp(&other.is_upper_boundary))
-                                    .then_with(|| self.get_edge_id().cmp(&other.get_edge_id()))
+                                    .then_with(|| self.edge_id.cmp(&other.edge_id))
                             }
                         }
                     }
@@ -350,11 +367,13 @@ impl<'a, T> Ord for SweepEvent<T>
 #[cfg(test)]
 mod test {
     use super::*;
+    use std::collections::BinaryHeap;
 
     #[test]
     fn test_prefer_right_events_over_left_events() {
         let left = SweepEvent::new_rc(
             0,
+            (0, 0).into(),
             (0, 0).into(),
             true, // left
             Weak::new(),
@@ -364,6 +383,7 @@ mod test {
         );
         let right = SweepEvent::new_rc(
             0,
+            (0, 0).into(),
             (0, 0).into(),
             false, // right
             Weak::new(),
@@ -376,9 +396,43 @@ mod test {
     }
 
     #[test]
+    fn test_prefer_right_events_over_left_events_in_binary_heap() {
+        let left = SweepEvent::new_rc(
+            0,
+            (0, 0).into(),
+            (0, 0).into(),
+            true, // left
+            Weak::new(),
+            PolygonType::Subject,
+            EdgeType::Normal,
+            false,
+        );
+        let right = SweepEvent::new_rc(
+            0,
+            (0, 0).into(),
+            (0, 0).into(),
+            false, // right
+            Weak::new(),
+            PolygonType::Subject,
+            EdgeType::Normal,
+            false,
+        );
+
+        let mut heap = BinaryHeap::new();
+        heap.push(right);
+        heap.push(left);
+
+        let e1 = heap.pop().unwrap();
+        let e2 = heap.pop().unwrap();
+        assert!(!e1.is_left_event);
+        assert!(e2.is_left_event);
+    }
+
+    #[test]
     fn test_on_equal_x_sort_y() {
         let lower = SweepEvent::new_rc(
             0,
+            (0, 0).into(),
             (0, 0).into(),
             true, // left
             Weak::new(),
@@ -388,6 +442,7 @@ mod test {
         );
         let upper = SweepEvent::new_rc(
             0,
+            (0, 1).into(),
             (0, 1).into(),
             false, // right
             Weak::new(),

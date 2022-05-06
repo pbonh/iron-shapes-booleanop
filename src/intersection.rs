@@ -39,10 +39,15 @@ use std::cmp::Ordering;
 use itertools::Itertools;
 use num_integer::Integer;
 use crate::PolygonSemantics;
+use std::borrow::BorrowMut;
+use crate::naive_scanline::NaiveScanLine;
 
 /// Insert the edges of the polygons into the event queue.
-fn fill_queue<'a, T, S, C>(subject: S,
-                           clipping: C) -> BinaryHeap<Rc<SweepEvent<T>>>
+fn fill_queue<'a, T, S, C>(
+    subject: S,
+    clipping: C,
+    event_id_generator: &mut RangeFrom<usize>,
+) -> BinaryHeap<Rc<SweepEvent<T>>>
     where S: Iterator<Item=&'a Polygon<T>>,
           C: Iterator<Item=&'a Polygon<T>>,
           T: CoordinateType + 'a {
@@ -51,19 +56,21 @@ fn fill_queue<'a, T, S, C>(subject: S,
     /// Add edges of a polygon to the event queue.
     fn process_polygon<T: CoordinateType>(event_queue: &mut BinaryHeap<Rc<SweepEvent<T>>>,
                                           poly: &SimplePolygon<T>,
-                                          polygon_type: PolygonType) {
+                                          polygon_type: PolygonType,
+                                          event_id_generator: &mut RangeFrom<usize>,) {
         for edge in poly.edges() {
             // Skip degenerate edges.
             if !edge.is_degenerate() {
-                let edge_id = usize::MAX;
+                let edge_id = event_id_generator.next().unwrap();
                 let event_a_is_left = edge.start < edge.end;
 
                 // Upper boundary edges are directed from right to left.
                 let is_upper_boundary = edge.end < edge.start;
 
-                let event_a = SweepEvent::new_rc(
+                let mut event_a = SweepEvent::new_rc(
                     edge_id,
                     edge.start,
+                    edge.end,
                     event_a_is_left,
                     Weak::new(),
                     polygon_type,
@@ -73,13 +80,13 @@ fn fill_queue<'a, T, S, C>(subject: S,
                 let event_b = SweepEvent::new_rc(
                     edge_id,
                     edge.end,
+                    edge.start,
                     !event_a_is_left,
                     Rc::downgrade(&event_a),
                     polygon_type,
                     EdgeType::Normal,
                     is_upper_boundary,
                 );
-
 
                 event_a.set_other_event(&event_b);
 
@@ -91,19 +98,19 @@ fn fill_queue<'a, T, S, C>(subject: S,
 
     // Subject polygons.
     for p in subject {
-        process_polygon(&mut event_queue, &p.exterior, PolygonType::Subject);
+        process_polygon(&mut event_queue, &p.exterior, PolygonType::Subject, event_id_generator);
         for i in &p.interiors {
             // Holes
-            process_polygon(&mut event_queue, i, PolygonType::Subject);
+            process_polygon(&mut event_queue, i, PolygonType::Subject, event_id_generator);
         }
     }
 
     // Clipping polygons.
     for p in clipping {
-        process_polygon(&mut event_queue, &p.exterior, PolygonType::Clipping);
+        process_polygon(&mut event_queue, &p.exterior, PolygonType::Clipping, event_id_generator);
         for i in &p.interiors {
             // Holes
-            process_polygon(&mut event_queue, i, PolygonType::Clipping);
+            process_polygon(&mut event_queue, i, PolygonType::Clipping, event_id_generator);
         }
     }
 
@@ -118,8 +125,23 @@ pub fn compute_fields<T>(event: &Rc<SweepEvent<T>>,
     where
         T: CoordinateType,
 {
+
+    // // Skip verticals.
+    // let mut maybe_prev_prev = None;
+    // let maybe_prev = if let Some(prev) = maybe_prev {
+    //     if prev.is_vertical() {
+    //         maybe_prev_prev = maybe_prev.and_then(|prev| prev.get_prev().upgrade());
+    //         maybe_prev_prev.as_ref()
+    //     } else {
+    //         maybe_prev
+    //     }
+    // } else {
+    //     maybe_prev
+    // };
+
     if let Some(prev) = maybe_prev {
         debug_assert_eq!(event.is_left_event(), prev.is_left_event());
+
 
         let is_same_type = event.polygon_type == prev.polygon_type;
 
@@ -207,7 +229,6 @@ pub fn compute_fields<T>(event: &Rc<SweepEvent<T>>,
         //         }
         //     }
         // }
-
     } else {
         // This is the first event in the scan line.
         // First event in the scan line, it is not vertical.
@@ -253,6 +274,7 @@ pub fn boolean_op<'a, I, T, S, C>(edge_intersection: I,
     let mut event_queue = fill_queue(
         subject.into_iter(),
         clipping.into_iter(),
+        &mut event_id_generator,
     );
 
     // Compute the edge intersections, the result is a set of sorted non-intersecting edges stored
@@ -306,10 +328,12 @@ fn subdivide_segments<T: CoordinateType + Debug, I>(
     sorted_events.reserve(event_queue.len());
 
     let mut scan_line = SplaySet::new(compare_events_by_segments);
+    // let mut scan_line = NaiveScanLine::new(compare_events_by_segments);
 
     let mut scan_line_position = None; // For sanity checks only.
+    let mut previous_event: Option<Rc<SweepEvent<T>>> = None;
 
-    while let Some(event) = event_queue.pop() {
+    while let Some(mut event) = event_queue.pop() {
         debug_assert!(event.is_left_event() ^ event.get_other_event().unwrap().is_left_event());
 
         let other_event = event.get_other_event().unwrap();
@@ -319,14 +343,115 @@ fn subdivide_segments<T: CoordinateType + Debug, I>(
         }
         scan_line_position = Some(event.p.x);
 
-        // If the event does not come from subdividing a segment
-        // it must be assigned a new ID such that the ordering of collinear segments
-        // will be preserved.
-        if event.get_edge_id() == usize::MAX {
-            debug_assert!(event.is_left_event(), "Right events should have the ID already assigned.");
-            let edge_id = event_id_generator.next().unwrap();
-            event.set_edge_id(edge_id);
-            other_event.set_edge_id(edge_id);
+        // // If the event does not come from subdividing a segment
+        // // it must be assigned a new ID such that the ordering of collinear segments
+        // // will be preserved.
+        // if event.get_edge_id() == usize::MAX {
+        //     debug_assert!(event.is_left_event(), "Right events should have the ID already assigned.");
+        //     let edge_id = event_id_generator.next().unwrap();
+        //     event.set_edge_id(edge_id);
+        //     other_event.set_edge_id(edge_id);
+        // }
+
+        if event.is_left_event() {
+
+            debug_assert!(!scan_line.contains(&event), "Event is already in the scan line.");
+
+
+            {
+                let maybe_next = scan_line.next(&event);
+                let maybe_prev = scan_line.prev(&event);
+
+                if let Some(next) = maybe_next {
+                    debug_assert_ne!(compare_events_by_segments(&event, next), Ordering::Greater);
+                }
+
+                if let Some(prev) = maybe_prev {
+                    // Debug-assert that the ordering of scan line elements is correct.
+                    debug_assert_ne!(compare_events_by_segments(&event, prev), Ordering::Less);
+                }
+
+                if let Some(next) = maybe_next {
+                    debug_assert!(
+                        compare_events_by_segments(&event, next) != Ordering::Greater,
+                        "ordering of elements in scanline is wrong"
+                    );
+                    let queue_modified = possible_intersection(&edge_intersection, &event, &next, event_queue);
+                    if queue_modified {
+                        scan_line.remove(&event);
+                        event_queue.push(event);
+                        continue;
+                    }
+                }
+
+                if let Some(prev) = maybe_prev {
+                    debug_assert_ne!(
+                        compare_events_by_segments(&event, prev), Ordering::Less,
+                        "ordering of elements in scanline is wrong"
+                    );
+                    let queue_modified = possible_intersection(&edge_intersection, &prev, &event, event_queue);
+                    if queue_modified {
+                        scan_line.remove(&event);
+                        event_queue.push(event);
+                        continue;
+                    }
+                }
+
+
+                {
+                    println!("{:?}, is_left={:?}", event.p, event.is_left_event());
+
+                    if let Some(p) = &previous_event {
+                        debug_assert_eq!(p.cmp(&event), Ordering::Greater);
+                    }
+                    previous_event = Some(event.clone());
+                }
+
+                compute_fields(&event, maybe_prev, polygon_semantics);
+            }
+
+            scan_line.insert(event.clone());
+
+            // if let Some(next) = maybe_next {
+            //     debug_assert!(
+            //         compare_events_by_segments(&event, next) != Ordering::Greater,
+            //         "ordering of elements in scanline is wrong"
+            //     );
+            //     possible_intersection(&edge_intersection,
+            //                           &event, &next, event_queue);
+            // }
+            //
+            // if let Some(prev) = maybe_prev {
+            //     debug_assert_ne!(
+            //         compare_events_by_segments(&event, prev), Ordering::Less,
+            //         "ordering of elements in scanline is wrong"
+            //     );
+            //     possible_intersection(&edge_intersection,
+            //                           &prev, &event, event_queue);
+            // }
+        } else {
+            let left_event = other_event;
+
+            // `event` must be a right event.
+            debug_assert!(!event.is_left_event());
+            debug_assert!(left_event.is_left_event());
+
+            debug_assert!(scan_line.contains(&left_event), "Left event is not in scan line.");
+
+            {
+                let maybe_prev = scan_line.prev(&left_event).cloned();
+                let maybe_next = scan_line.next(&left_event).cloned();
+
+                println!("remove {:?}", left_event.get_edge().unwrap());
+                scan_line.remove(&left_event);
+
+                // prev and next are possibly new neighbours. Check for intersection.
+                if let (Some(prev), Some(next)) = (maybe_prev, maybe_next) {
+                    debug_assert!(compare_events_by_segments(&next, &prev) != Ordering::Less);
+                    possible_intersection(&edge_intersection,
+                                          &prev, &next, event_queue);
+                }
+            }
         }
 
         // Insert the event such that the list remains sorted.
@@ -352,69 +477,7 @@ fn subdivide_segments<T: CoordinateType + Debug, I>(
             );
 
             // Insert event at found position.
-            sorted_events.insert(pos, event.clone());
-        }
-
-        if event.is_left_event() {
-            debug_assert!(!scan_line.contains(&event), "Event is already in the scan line.");
-            // println!("insert {:?}", event.get_edge_id());
-
-            scan_line.insert(event.clone());
-
-            let maybe_next = scan_line.next(&event);
-            if let Some(next) = maybe_next {
-                debug_assert_ne!(compare_events_by_segments(&event, next), Ordering::Greater);
-            }
-
-            let maybe_prev = scan_line.prev(&event);
-            if let Some(prev) = maybe_prev {
-                // Debug-assert that the ordering of scan line elements is correct.
-                debug_assert_ne!(compare_events_by_segments(&event, prev), Ordering::Less);
-            }
-
-            compute_fields(&event, maybe_prev, polygon_semantics);
-
-
-            if let Some(next) = maybe_next {
-                debug_assert!(
-                    compare_events_by_segments(&event, next) != Ordering::Greater,
-                    "ordering of elements in scanline is wrong"
-                );
-                possible_intersection(&edge_intersection,
-                                      &event, &next, event_queue);
-            }
-
-            if let Some(prev) = maybe_prev {
-                debug_assert_ne!(
-                    compare_events_by_segments(&event, prev), Ordering::Less,
-                    "ordering of elements in scanline is wrong"
-                );
-                possible_intersection(&edge_intersection,
-                                      &prev, &event, event_queue);
-            }
-        } else {
-            let left_event = other_event;
-
-            // `event` must be a right event.
-            debug_assert!(!event.is_left_event());
-            debug_assert!(left_event.is_left_event());
-
-            debug_assert!(scan_line.contains(&left_event), "Left event is not in scan line.");
-
-            if scan_line.contains(&left_event) {
-                let maybe_prev = scan_line.prev(&left_event).cloned();
-                let maybe_next = scan_line.next(&left_event).cloned();
-
-                // println!("remove {:?}", left_event.get_edge_id());
-                scan_line.remove(&left_event);
-
-                // prev and next are possibly new neighbours. Check for intersection.
-                if let (Some(prev), Some(next)) = (maybe_prev, maybe_next) {
-                    debug_assert!(compare_events_by_segments(&next, &prev) != Ordering::Less);
-                    possible_intersection(&edge_intersection,
-                                          &prev, &next, event_queue);
-                }
-            }
+            sorted_events.insert(pos, event);
         }
     }
 

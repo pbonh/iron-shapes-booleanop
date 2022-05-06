@@ -357,37 +357,12 @@ pub fn connect_edges<T>(sorted_events: &[Rc<SweepEvent<T>>],
     where
         T: CoordinateType + Debug,
 {
-    // println!("all edges:");
-    // for e in sorted_events {
-    //     if e.is_left_event() {
-    //         println!("{:?},\touter={:?}, upper={:?}, type={:?}, outside_other={:?}",
-    //                  e.get_edge_left_right(),
-    //                  e.is_outer_boundary(polygon_semantics),
-    //                  e.is_upper_boundary(polygon_semantics),
-    //                  e.get_edge_type(),
-    //                  e.is_outside_other(polygon_semantics)
-    //         );
-    //     }
-    // }
 
     let mut relevant_events = filter_events(sorted_events, operation, polygon_semantics);
 
     if operation == Operation::Xor || polygon_semantics == PolygonSemantics::XOR {
         relevant_events = xor_cancel_double_edges(relevant_events);
     }
-
-    // println!("relevant:");
-    // for e in &relevant_events {
-    //     if e.is_left_event() {
-    //         println!("{:?},\touter={:?}, upper={:?}, type={:?}, outside_other={:?}",
-    //                  e.get_edge_left_right(),
-    //                  e.is_outer_boundary(polygon_semantics),
-    //                  e.is_upper_boundary(polygon_semantics),
-    //                  e.get_edge_type(),
-    //                  e.is_outside_other(polygon_semantics)
-    //         );
-    //     }
-    // }
 
     let mut events = order_events(&mut relevant_events);
 
@@ -401,6 +376,7 @@ pub fn connect_edges<T>(sorted_events: &[Rc<SweepEvent<T>>],
 
     for i in 0..events.len() {
         // Find the next unprocessed event from the left.
+
         if processed[i] {
             continue;
         }
@@ -467,6 +443,7 @@ pub fn connect_edges<T>(sorted_events: &[Rc<SweepEvent<T>>],
         // Follow the lines until the contour is closed.
         loop {
             let other_pointer = {
+                // Propagate fields to the right event.
                 let e = &mut events[pointer];
                 e.contour_id = polygon_id;
                 e.is_hole = is_hole;

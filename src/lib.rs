@@ -49,6 +49,7 @@ mod sweep_event;
 mod compare_segments;
 mod connect_edges;
 mod possible_intersection;
+mod naive_scanline;
 
 use num_rational::{Rational32, Rational64};
 
