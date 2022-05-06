@@ -171,7 +171,6 @@ mod test {
             false,
             Weak::new(),
             polygon_type,
-            EdgeType::Normal,
             false,
         );
         let event = SweepEvent::new_rc(
@@ -181,7 +180,6 @@ mod test {
             true,
             Rc::downgrade(&other),
             polygon_type,
-            EdgeType::Normal,
             false,
         );
         other.set_other_event(&event);

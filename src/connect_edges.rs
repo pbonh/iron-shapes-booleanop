@@ -21,7 +21,7 @@
 //! Connect the resulting edges of the sweep line algorithm into polygons.
 
 use iron_shapes::CoordinateType;
-use super::sweep_event::{SweepEvent, PolygonType, EdgeType};
+use super::sweep_event::{SweepEvent, PolygonType};
 use super::Operation;
 use std::rc::Rc;
 use std::fmt::Debug;

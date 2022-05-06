@@ -464,7 +464,6 @@ PolygonSemantics::XOR,
 
     #[test]
     fn test_polygon_with_vertical_zero_width_part() {
-        use num_rational::Ratio;
 
         let a = Polygon {
             exterior: SimplePolygon {
@@ -478,26 +477,13 @@ PolygonSemantics::XOR,
             interiors: vec![],
         };
 
-        // let a = Polygon {
-        //     exterior: SimplePolygon {
-        //         points: vec![
-        //             Point::new(0., 0.),
-        //             Point::new(2., 0.),
-        //             Point::new(2., 2.),
-        //             Point::new(0., 2.),
-        //             Point::new(0., 3.), // Zero-width spike.
-        //         ],
-        //     },
-        //     interiors: vec![],
-        // };
-
         let b = Polygon {
             exterior: SimplePolygon {
                 points: vec![
                     Point::new(0., 2.),
                     Point::new(2., 0.),
                     Point::new(0., 1.),
-                    Point::new(0., 3.),
+                    Point::new(0., 3.), // Zero-width spike.
                 ],
             },
             interiors: vec![],

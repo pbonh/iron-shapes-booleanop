@@ -17,6 +17,11 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with this program. If not, see <http://www.gnu.org/licenses/>.
  */
+//! Drop-in replacement for the splay set used for the scanline.
+//! Very easy implementation but inefficient for large problems.
+
+#![allow(unused)]
+
 use std::cmp::Ordering;
 
 /// Naive and inefficient implementation of the data structure used for the scan line.

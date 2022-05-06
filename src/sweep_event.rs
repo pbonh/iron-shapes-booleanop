@@ -32,22 +32,6 @@ pub enum PolygonType {
     Clipping,
 }
 
-/// Define the type of contribution of an edge to the final result.
-#[derive(Debug, PartialEq, Eq, Copy, Clone)]
-pub enum EdgeType {
-    /// An edge that does not overlap with any other and contributes to the final result.
-    /// That's the default.
-    Normal,
-    /// No contribution to the result.
-    NonContributing,
-    /// The edge represents two collinear edges of different polygons. Both have
-    /// the 'inside' of the polygon on the *same* side.
-    SameTransition,
-    /// The edge represents two collinear edges of different polygons. They have
-    /// the 'inside' of the polygon on *different* sides.
-    DifferentTransition,
-}
-
 /// Mutable data of a sweep event.
 #[derive(Debug, Clone)]
 struct MutablePart<T: CoordinateType> {
@@ -61,8 +45,6 @@ struct MutablePart<T: CoordinateType> {
     /// Counts the parity of all edges of the other polygon type (clipping/subject) below this edge.
     /// Lower boundaries are counted as 1, upper boundaries are counted as -1.
     other_edge_count: i32,
-    /// Tell how the edge contributes to the final result.
-    edge_type: EdgeType,
     /// Index of this event in an array.
     /// In a later step of the algorithm this will hold the index of the other event.
     pos: usize,
@@ -97,7 +79,6 @@ impl<T: CoordinateType> SweepEvent<T> {
         is_left_event: bool,
         other_event: Weak<SweepEvent<T>>,
         polygon_type: PolygonType,
-        edge_type: EdgeType,
         is_upper_boundary: bool,
     ) -> Rc<SweepEvent<T>> {
         Rc::new(SweepEvent {
@@ -105,7 +86,6 @@ impl<T: CoordinateType> SweepEvent<T> {
                 other_event,
                 prev: Weak::new(),
                 edge_count: 0,
-                edge_type,
                 other_edge_count: 0,
                 pos: 0,
             }),
@@ -121,19 +101,6 @@ impl<T: CoordinateType> SweepEvent<T> {
     pub fn is_left_event(&self) -> bool {
         self.is_left_event
     }
-
-    // pub fn set_left_event(&self, left: bool) {
-    //     self.mutable.borrow_mut().is_left_event = left
-    // }
-
-    /// Check if the corresponding line segment is vertical.
-    pub fn is_vertical(&self) -> bool {
-        match self.get_other_event() {
-            Some(ref other_event) => self.p.x == other_event.p.x,
-            None => false,
-        }
-    }
-
 
     /// Get the event that represents the other end point of this segment.
     pub fn get_other_event(&self) -> Option<Rc<SweepEvent<T>>> {
@@ -160,23 +127,6 @@ impl<T: CoordinateType> SweepEvent<T> {
         })
     }
 
-    /// Get the segment associated with the event.
-    /// The endpoints are sorted such that the left endpoint is `start`.
-    pub fn get_edge_left_right(&self) -> Option<Edge<T>> {
-        self.get_other_event().map(|other| {
-            let p1 = self.p;
-            let p2 = other.p;
-
-            debug_assert!(self.is_left_event() ^ other.is_left_event());
-
-            if self.is_left_event() {
-                Edge::new(p1, p2)
-            } else {
-                Edge::new(p2, p1)
-            }
-        })
-    }
-
     /// Get the original edge associated with this event. Start and end point are sorted.
     pub fn get_original_edge(&self) -> Edge<T> {
         let edge1 = Edge::new(self.p, self.p2_original);
@@ -186,14 +136,6 @@ impl<T: CoordinateType> SweepEvent<T> {
         } else {
             edge1.reversed()
         }
-    }
-
-    pub fn get_edge_type(&self) -> EdgeType {
-        self.mutable.borrow().edge_type
-    }
-
-    pub fn set_edge_type(&self, edge_type: EdgeType) {
-        self.mutable.borrow_mut().edge_type = edge_type
     }
 
     pub fn edge_count(&self) -> i32 {
@@ -261,11 +203,6 @@ impl<T: CoordinateType> SweepEvent<T> {
     pub fn get_edge_id(&self) -> usize {
         self.edge_id
     }
-
-    pub fn set_edge_id(&mut self, edge_id: usize) {
-        self.edge_id = edge_id
-    }
-
 
     pub fn get_prev(&self) -> Weak<SweepEvent<T>> {
         self.mutable.borrow().prev.clone()
@@ -378,7 +315,6 @@ mod test {
             true, // left
             Weak::new(),
             PolygonType::Subject,
-            EdgeType::Normal,
             false,
         );
         let right = SweepEvent::new_rc(
@@ -388,7 +324,6 @@ mod test {
             false, // right
             Weak::new(),
             PolygonType::Subject,
-            EdgeType::Normal,
             false,
         );
 
@@ -404,7 +339,6 @@ mod test {
             true, // left
             Weak::new(),
             PolygonType::Subject,
-            EdgeType::Normal,
             false,
         );
         let right = SweepEvent::new_rc(
@@ -414,7 +348,6 @@ mod test {
             false, // right
             Weak::new(),
             PolygonType::Subject,
-            EdgeType::Normal,
             false,
         );
 
@@ -437,7 +370,6 @@ mod test {
             true, // left
             Weak::new(),
             PolygonType::Subject,
-            EdgeType::Normal,
             false,
         );
         let upper = SweepEvent::new_rc(
@@ -447,7 +379,6 @@ mod test {
             false, // right
             Weak::new(),
             PolygonType::Subject,
-            EdgeType::Normal,
             false,
         );
 
