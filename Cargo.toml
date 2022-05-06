@@ -1,8 +1,8 @@
 [package]
 name = "iron-shapes-booleanop"
-version = "0.0.2"
+version = "0.0.3"
 authors = ["Thomas Kramer <code@tkramer.ch>"]
-edition = "2018"
+edition = "2021"
 license = "AGPL-3.0-or-later"
 description = "Boolean operations on polygons for iron-shapes."
 
