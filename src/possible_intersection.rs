@@ -102,8 +102,6 @@ fn divide_segment<T>(event: &Rc<SweepEvent<T>>,
         debug_assert!(event.is_left_event() ^ event.get_other_event().unwrap().is_left_event());
         debug_assert!(other_event.is_left_event() ^ other_event.get_other_event().unwrap().is_left_event());
 
-        dbg!(l.p, l.is_left_event());
-        dbg!(r.p, r.is_left_event());
         queue.push(l);
         queue.push(r);
 
@@ -150,25 +148,6 @@ pub fn possible_intersection<F, I>(
     match edge_intersection_fn(&edge1, &edge2) {
         EdgeIntersection::None => false,
         EdgeIntersection::Point(p) => {
-
-//                debug_assert!({
-//                                  let e1 = edge1.cast();
-//                                  let e2 = edge2.cast();
-//                                  p.x >= e1.start.x && p.x >= e2.start.x
-//                              },
-//                              "Intersection lies left of both edges.");
-//
-//                // The intersection is neither an endpoint of se1 nor se2.
-//                debug_assert!({
-//                                  let e1 = edge1.cast();
-//                                  let e2 = edge2.cast();
-//                                  p != e1.start
-//                                      && p != e1.end
-//                                      && p != e2.start
-//                                      && p != e2.end
-//                              },
-//                              "Intersection should not be an endpoint.");
-
             divide_segment(event1, p, queue);
             divide_segment(event2, p, queue);
             true

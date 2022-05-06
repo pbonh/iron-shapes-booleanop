@@ -50,27 +50,6 @@ struct Event<T: CoordinateType> {
     contour_id: usize,
 }
 
-//impl<T> Eq for Event<T>
-//    where T: CoordinateType {}
-//
-//impl<T> PartialOrd for Event<T>
-//    where T: CoordinateType {
-//    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-//        Some(self.cmp(other))
-//    }
-//}
-//
-//impl<T> Ord for Event<T>
-//    where T: CoordinateType {
-//    fn cmp(&self, other: &Self) -> Ordering {
-//        let point_ordering = self.p.partial_cmp(&other.p).unwrap();
-//        let left_right_ordering = self.is_left_event.cmp(&other.is_left_event);
-//
-//        // Ordering by point, break ties by sorting left before right events.
-//        point_ordering.then(left_right_ordering)
-//    }
-//}
-
 
 /// Check if the event contributes to the result.
 fn contributes_to_result<T>(event: &SweepEvent<T>,
@@ -91,33 +70,6 @@ fn contributes_to_result<T>(event: &SweepEvent<T>,
             }
             Operation::Xor => true,
         }
-
-    // TODO: check correctness.
-    // event.is_outer_boundary(polygon_semantics)
-    //     && match event.get_edge_type() {
-    //     EdgeType::Normal => match operation {
-    //         Operation::Intersection => !event.is_outside_other(polygon_semantics),
-    //         Operation::Union => event.is_outside_other(polygon_semantics),
-    //         Operation::Difference => match event.polygon_type {
-    //             PolygonType::Subject => event.is_outside_other(polygon_semantics),
-    //             PolygonType::Clipping => !event.is_outside_other(polygon_semantics)
-    //         }
-    //         Operation::Xor => true,
-    //     },
-    //     // If the edge is a result of a overlapping intersection:
-    //     // Same bounds (upper, upper) or (lower, lower):
-    //     EdgeType::SameTransition => match operation {
-    //         Operation::Intersection => true,
-    //         Operation::Union => true,
-    //         _ => false
-    //     },
-    //     // Opposite bounds.
-    //     EdgeType::DifferentTransition => match operation {
-    //         Operation::Difference => true,
-    //         _ => false
-    //     },
-    //     EdgeType::NonContributing => false,
-    // }
 }
 
 /// Take all the events that contribute to the result.

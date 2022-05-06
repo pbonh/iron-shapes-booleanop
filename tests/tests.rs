@@ -408,17 +408,9 @@ mod test {
         // The edges on the x-axis are collinear and overlap.
 
         let p = |a: i64, b: i64| Point::new(Rational64::from(a), Rational64::from(b));
-//        let p = |a: i64, b: i64| Point::new(a, b);
-
 
         let a = Polygon::from(vec![p(0, 0), p(0, 2)]);
-//        let a = Polygon::from(vec![p(0, 0), p(0, 1), p(0, 3), p(0, 1)]);
         let b = Polygon::from(vec![p(0, 1), p(1, 1), p(1, 2)]);
-
-
-//        // similar but no verticals (works)
-//        let a = Polygon::from(vec![p(0, 0), p(2, 4)]);
-//        let b = Polygon::from(vec![p(1, 2), p(3, 2), p(3, 4)]);
 
         let result = boolean_op(
             edge_intersection_rational,
@@ -437,11 +429,9 @@ mod test {
     fn test_rational_collinear_edge3() {
         // The edges on the x-axis are collinear and overlap.
 
-//        let p = |a: i64, b: i64| Point::new(a, b);
         let p = |a: i64, b: i64| Point::new(Rational64::from(a), Rational64::from(b));
 
         // Some random translation
-//        let t = Point::new(Rational64::new(100, 7), Rational64::new(5, 23));
         let t = Vector::new(Rational64::new(0, 1), Rational64::new(0, 1));
 
         let a = Polygon::from(vec![p(0, 0), p(11, 11), p(4, 8)]).translate(t);
@@ -608,22 +598,23 @@ PolygonSemantics::XOR,
     }
 
 
-//    #[test]
-//    fn test_almost_degenerate() {
-//        let p1 = Polygon::from(vec![(0., 0.), (1., 1.), (1., 1.0001)]);
-//        let p2 = Polygon::from(vec![(1., 0.), (0., 1.), (0., 1.0001)]);
-//
-//        let i = boolean_op(
-//            edge_intersection_float,
-//            &[&p1],
-//            &[&p2],
-//            Operation::Intersection,
-//            PolygonSemantics::XOR
-//        );
-//        println!("{:?}", i);
-//        assert_eq!(i.len(), 1);
-//        assert_eq!(i.polygons[0].len(), 4);
-//    }
+    // TOOD
+   // #[test]
+   // fn test_almost_degenerate() {
+   //     let p1 = Polygon::from(vec![(0., 0.), (1., 1.), (1., 1.0001)]);
+   //     let p2 = Polygon::from(vec![(1., 0.), (0., 1.), (0., 1.0001)]);
+   //
+   //     let i = boolean_op(
+   //         edge_intersection_float,
+   //         vec![&p1],
+   //         vec![&p2],
+   //         Operation::Intersection,
+   //         PolygonSemantics::XOR
+   //     );
+   //     println!("{:?}", i);
+   //     assert_eq!(i.len(), 1);
+   //     assert_eq!(i.polygons[0].len(), 4);
+   // }
 
 
 //

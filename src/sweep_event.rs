@@ -26,9 +26,13 @@ use iron_shapes::CoordinateType;
 use std::cmp::Ordering;
 use crate::PolygonSemantics;
 
+/// Distinguish between the left and right operand of the boolean operation.
+/// This matters for the boolean intersection and difference only.
 #[derive(Debug, PartialEq, Eq, Copy, Clone, Ord, PartialOrd)]
 pub enum PolygonType {
+    /// Left operand.
     Subject,
+    /// Right operand.
     Clipping,
 }
 
@@ -65,7 +69,6 @@ pub struct SweepEvent<T: CoordinateType> {
     /// Is this edge an upper boundary of the input polygon?
     pub is_upper_boundary: bool,
     /// Unique ID of the edge. Used to break ties and guarantee ordering for overlapping edges.
-    /// TODO: Is this necessary?
     pub edge_id: usize,
 }
 

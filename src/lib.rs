@@ -68,7 +68,7 @@ pub enum Operation {
     Difference,
     /// Compute the boolean OR.
     Union,
-    /// Compute the boolean XOR.
+    /// Compute the boolean XOR (symmetric difference).
     Xor,
 }
 
