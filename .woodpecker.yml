@@ -6,7 +6,7 @@ pipeline:
     build:
         image: rust
         commands:
-            - git clone https://codeberg.org/libreda/libreda-splay ../splay
+            - git clone https://codeberg.org/libreda/splay ../splay
             - cargo check
             - cargo test
     reuse:
