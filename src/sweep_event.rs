@@ -26,7 +26,7 @@ pub enum PolygonType {
 
 /// Mutable data of a sweep event.
 #[derive(Debug, Clone)]
-struct MutablePart<T: CoordinateType> {
+struct MutablePart<T> {
     /// Reference to the event associated with the other endpoint of the edge.
     other_event: Weak<SweepEvent<T>>,
     /// Edge below this event. This is used to find polygon-hole relationships.
@@ -43,7 +43,7 @@ struct MutablePart<T: CoordinateType> {
 }
 
 #[derive(Debug, Clone)]
-pub struct SweepEvent<T: CoordinateType> {
+pub struct SweepEvent<T> {
     /// Mutable part of the sweep event. Borrow checking happens at runtime.
     mutable: RefCell<MutablePart<T>>,
     /// Point associated with the event. Starting point or end point of the edge.

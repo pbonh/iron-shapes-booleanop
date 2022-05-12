@@ -12,11 +12,10 @@ use std::cmp::Ordering;
 
 /// Naive and inefficient implementation of the data structure used for the scan line.
 pub struct NaiveScanLine<K, C>
-    where
-        C: Fn(&K, &K) -> Ordering,
+    where C: Fn(&K, &K) -> Ordering,
 {
     comparator: C,
-    pub(crate) content: Vec<K>,
+    content: Vec<K>,
 }
 
 impl<T, C> NaiveScanLine<T, C>

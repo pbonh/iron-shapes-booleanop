@@ -47,6 +47,8 @@ mod compare_segments;
 mod connect_edges;
 mod possible_intersection;
 mod naive_scanline;
+mod btree_scanline;
+mod splay_scanline;
 
 use num_rational::{Rational32, Rational64};
 

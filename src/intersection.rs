@@ -14,7 +14,6 @@ use num_rational::Ratio;
 use iron_shapes::multi_polygon::MultiPolygon;
 
 use iron_shapes::CoordinateType;
-use libreda_splay::SplaySet;
 use super::sweep_event::*;
 use super::Operation;
 use num_traits::{Float, PrimInt};
@@ -22,11 +21,14 @@ use super::compare_segments::compare_events_by_segments;
 use super::connect_edges::connect_edges;
 use super::possible_intersection::possible_intersection;
 use std::fmt::Debug;
-use std::ops::RangeFrom;
+use std::ops::{RangeFrom, Deref};
 use std::cmp::Ordering;
 use itertools::Itertools;
 use num_integer::Integer;
 use crate::PolygonSemantics;
+use crate::splay_scanline::SplayScanLine;
+use crate::btree_scanline::BTreeScanLine;
+use crate::naive_scanline::NaiveScanLine;
 
 /// Insert the edges of the polygons into the event queue.
 fn fill_queue<'a, T, S, C>(
@@ -214,6 +216,46 @@ pub fn edge_intersection_integer<T: PrimInt + Debug>(e1: &Edge<T>, e2: &Edge<T>)
     e1.edge_intersection_rounded(e2)
 }
 
+/// Wrap a SweepEvent in order to use another implementation of `Ord` which is needed for the scanline.
+#[derive(Clone)]
+struct ScanlineElement<T>(Rc<SweepEvent<T>>) where T: CoordinateType;
+
+impl<T: PartialEq + CoordinateType> PartialEq for ScanlineElement<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.eq(&other.0)
+    }
+}
+
+impl<T: PartialEq + CoordinateType> Eq for ScanlineElement<T> {}
+
+impl<T> Deref for ScanlineElement<T>
+    where T: CoordinateType {
+    type Target = Rc<SweepEvent<T>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<T> Ord for ScanlineElement<T>
+    where T: CoordinateType + Debug {
+    fn cmp(&self, other: &Self) -> Ordering {
+        compare_events_by_segments(self, other)
+    }
+}
+
+impl<T> PartialOrd for ScanlineElement<T>
+    where T: CoordinateType + Debug {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(compare_events_by_segments(self, other))
+    }
+}
+
+/// Helper function to be used as comparator for the `SplayScanLine`.
+fn compare_scanline_elements<T>(a: &ScanlineElement<T>, b: &ScanlineElement<T>) -> Ordering
+    where T: CoordinateType + Debug {
+    compare_events_by_segments(a, b)
+}
 
 /// Find all intersecting segments and subdivide them such that the set of resulting segments contains
 /// no intersecting segments anymore.
@@ -227,8 +269,10 @@ fn subdivide_segments<T: CoordinateType + Debug, I>(
     // Reserve the minimum amount of storage necessary.
     sorted_events.reserve(event_queue.len());
 
-    let mut scan_line = SplaySet::new(compare_events_by_segments);
-    // let mut scan_line = NaiveScanLine::new(compare_events_by_segments);
+
+    // let mut scan_line = SplayScanLine::new(compare_scanline_elements);
+    let mut scan_line: BTreeScanLine<ScanlineElement<T>> = BTreeScanLine::new();
+    // let mut scan_line = NaiveScanLine::new(compare_scanline_elements);
 
     #[cfg(debug)]
         let mut scan_line_position = None; // For sanity checks only.
@@ -236,8 +280,9 @@ fn subdivide_segments<T: CoordinateType + Debug, I>(
     // Process all events.
     while let Some(event) = event_queue.pop() {
         debug_assert!(event.is_left_event() ^ event.get_other_event().unwrap().is_left_event());
+        let event = ScanlineElement(event);
 
-        let other_event = event.get_other_event().unwrap();
+        let other_event = ScanlineElement(event.get_other_event().unwrap());
 
         #[cfg(debug)] {
             if let Some(pos) = scan_line_position {
@@ -264,7 +309,7 @@ fn subdivide_segments<T: CoordinateType + Debug, I>(
                     let queue_modified = possible_intersection(&edge_intersection, &event, &next, event_queue);
                     if queue_modified {
                         scan_line.remove(&event);
-                        event_queue.push(event);
+                        event_queue.push(event.0);
                         continue;
                     }
                 }
@@ -283,12 +328,12 @@ fn subdivide_segments<T: CoordinateType + Debug, I>(
                     let queue_modified = possible_intersection(&edge_intersection, &prev, &event, event_queue);
                     if queue_modified {
                         scan_line.remove(&event);
-                        event_queue.push(event);
+                        event_queue.push(event.0);
                         continue;
                     }
                 }
 
-                compute_fields(&event, maybe_prev);
+                compute_fields(&event, maybe_prev.map(|e| e.deref()));
             }
 
             // Insert new event into the scanline.
@@ -340,7 +385,7 @@ fn subdivide_segments<T: CoordinateType + Debug, I>(
             );
 
             // Insert event at found position.
-            sorted_events.insert(pos, event);
+            sorted_events.insert(pos, event.0);
         }
     }
 
