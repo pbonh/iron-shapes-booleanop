@@ -1,5 +1,7 @@
 // Copyright (c) 2018-2021 Thomas Kramer.
 // SPDX-FileCopyrightText: 2022 Thomas Kramer
+// SPDX-FileCopyrightText: 2020 Fabian Keller <github.100.fkeller@spamgourmet.com> (contributions under MIT licence)
+// SPDX-FileCopyrightText: 2020 Bodo Junglas <junglas@objectcode.de> (contributions under MIT licence)
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
 

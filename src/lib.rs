@@ -2,6 +2,12 @@
 // SPDX-FileCopyrightText: 2022 Thomas Kramer
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
+//
+// Original licence until 2020: MIT
+// SPDX-FileCopyrightText: 2020 Fabian Keller <github.100.fkeller@spamgourmet.com> (contributions under MIT licence)
+// SPDX-FileCopyrightText: 2020 Bodo Junglas <junglas@objectcode.de> (contributions under MIT licence)
+// SPDX-FileCopyrightText: 2020 Boyd Johnson (all contributions overwritten by now)
+// SPDX-FileCopyrightText: 2020 Robert Sayre (all contributions overwritten by now)
 
 #![deny(missing_docs)]
 
