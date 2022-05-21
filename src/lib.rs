@@ -36,10 +36,12 @@
 //! ```
 //!
 //! # References
-//! * Loosely based on: F. Martinez, A. Rueda, F. Feito, "A new algorithm for computing Boolean operations on polygons", 2013, doi:10.1016/j.advengsoft.2013.04.004
+//! * This work is originally loosely based: F. Martinez, A. Rueda, F. Feito, "A new algorithm for computing Boolean operations on polygons", 2013, doi:10.1016/j.advengsoft.2013.04.004
 //!
 //! The algorithm implemented here deviates from the reference paper. Most notably, the ordering of lines
 //! 6-9 in Listing 2 is done differently to properly handle vertical overlapping edges.
+//!
+//! * More systematic approach: [PDF](https://www.boost.org/doc/libs/1_44_0/libs/polygon/doc/GTL_boostcon2009.pdf), [archived](https://web.archive.org/save/https://www.boost.org/doc/libs/1_44_0/libs/polygon/doc/GTL_boostcon2009.pdf)
 
 mod intersection;
 mod sweep_event;
