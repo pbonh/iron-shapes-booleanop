@@ -38,34 +38,14 @@ struct Event<T: CoordinateType> {
 }
 
 
-/// Check if the event contributes to the result.
-fn contributes_to_result<T, Ctr>(event: &SweepEvent<T, Ctr>,
-                            operation: Operation,
-                            polygon_semantics: PolygonSemantics) -> bool
-    where T: CoordinateType,
-{
-    debug_assert!(event.is_left_event());
-
-    event.is_outer_boundary(polygon_semantics)
-        &&
-        match operation {
-            Operation::Intersection => !event.is_outside_other(polygon_semantics),
-            Operation::Union => event.is_outside_other(polygon_semantics),
-            Operation::Difference => match event.polygon_type {
-                PolygonType::Subject => event.is_outside_other(polygon_semantics),
-                PolygonType::Clipping => !event.is_outside_other(polygon_semantics)
-            }
-            Operation::Xor => true,
-        }
-}
-
 /// Take all the events that contribute to the result.
 /// This depends on the boolean operation to be performed.
 /// Also adjusts the `prev` pointers for hole attribution.
-fn filter_events<T, Ctr>(sorted_events: &[Rc<SweepEvent<T, Ctr>>],
-                    operation: Operation,
-                    polygon_semantics: PolygonSemantics) -> Vec<Rc<SweepEvent<T, Ctr>>>
+fn filter_events<T, Ctr, ContributesToResultFn>(
+    sorted_events: &[Rc<SweepEvent<T, Ctr>>],
+    contributes_to_result: ContributesToResultFn) -> Vec<Rc<SweepEvent<T, Ctr>>>
     where T: CoordinateType + Debug,
+          ContributesToResultFn: Fn(&SweepEvent<T, Ctr>) -> bool
 {
     // Flags that tell whether the event contributes to the result or not.
     let mut contributes = vec![false; sorted_events.len()];
@@ -74,10 +54,10 @@ fn filter_events<T, Ctr>(sorted_events: &[Rc<SweepEvent<T, Ctr>>],
         event.set_pos(i);
 
         let contributes_to_result = if event.is_left_event() {
-            contributes_to_result(event, operation, polygon_semantics)
+            contributes_to_result(event)
         } else {
             event.get_other_event().map(|other|
-                contributes_to_result(other.as_ref(), operation, polygon_semantics))
+                contributes_to_result(other.as_ref()))
                 .unwrap_or(false)
         };
 
@@ -290,14 +270,16 @@ fn next_index<T: CoordinateType>(events: &[Event<T>],
 /// This uses the property events at the same point lie next to each other in the list
 /// of sorted events. This way it is easy to follow the contour: 1) Start at some left event,
 /// 2) go to its right event, 3) from there find a event with the same location.
-pub fn connect_edges<T, Ctr>(sorted_events: &[Rc<SweepEvent<T, Ctr>>],
-                        operation: Operation,
-                        polygon_semantics: PolygonSemantics) -> Vec<Polygon<T>>
+pub fn connect_edges<T, Ctr, ContributesToResultFn>(
+    sorted_events: &[Rc<SweepEvent<T, Ctr>>],
+    operation: Operation,
+    polygon_semantics: PolygonSemantics,
+    contributes_to_result: ContributesToResultFn) -> Vec<Polygon<T>>
     where
         T: CoordinateType + Debug,
+        ContributesToResultFn: Fn(&SweepEvent<T, Ctr>) -> bool
 {
-
-    let mut relevant_events = filter_events(sorted_events, operation, polygon_semantics);
+    let mut relevant_events = filter_events(sorted_events, contributes_to_result);
 
     if operation == Operation::Xor || polygon_semantics == PolygonSemantics::XOR {
         relevant_events = xor_cancel_double_edges(relevant_events);

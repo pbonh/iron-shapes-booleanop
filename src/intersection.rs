@@ -112,7 +112,7 @@ pub struct DualCounter {
 
 /// Compute flags and fields for a segment based on its predecessor in the scan line (if there is one).
 fn update_counter<T>(event: &Rc<SweepEvent<T, DualCounter>>,
-                         maybe_prev: Option<&Rc<SweepEvent<T, DualCounter>>>)
+                     maybe_prev: Option<&Rc<SweepEvent<T, DualCounter>>>)
     where T: CoordinateType,
 {
     if let Some(prev) = maybe_prev {
@@ -206,11 +206,36 @@ pub fn boolean_op<'a, I, T, S, C>(edge_intersection: I,
     let sorted_events = subdivide_segments(
         edge_intersection,
         &mut event_queue,
-        |event, prev| update_counter(event, prev)
+        |event, prev| update_counter(event, prev),
     );
 
+    // Check if the event is contained in the result.
+    let contributes_to_result_fn = |event: &SweepEvent<T, DualCounter>| -> bool {
+        debug_assert!(event.is_left_event());
+
+        let is_outer_boundary = event.is_outer_boundary(polygon_semantics);
+        let is_outside_other = event.is_outside_other(polygon_semantics);
+
+        is_outer_boundary
+            &&
+            match operation {
+                Operation::Intersection => !is_outside_other,
+                Operation::Union => is_outside_other,
+                Operation::Difference => match event.polygon_type {
+                    PolygonType::Subject => is_outside_other,
+                    PolygonType::Clipping => !is_outside_other
+                }
+                Operation::Xor => true,
+            }
+    };
+
     // Connect the edges into polygons.
-    let r = connect_edges(&sorted_events, operation, polygon_semantics);
+    let r = connect_edges(
+        &sorted_events,
+        operation,
+        polygon_semantics,
+        contributes_to_result_fn,
+    );
 
     MultiPolygon::from_polygons(r)
 }
