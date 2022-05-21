@@ -31,15 +31,6 @@ struct MutablePart<T, Ctr> {
     other_event: Weak<SweepEvent<T, Ctr>>,
     /// Edge below this event. This is used to find polygon-hole relationships.
     prev: Weak<SweepEvent<T, Ctr>>,
-    /// Counts the parity of all edges of the same polygon type (clipping/subject) below this edge.
-    /// Lower boundaries are counted as 1, upper boundaries are counted as -1.
-    edge_count: i32,
-    /// Counts the parity of all edges of the other polygon type (clipping/subject) below this edge.
-    /// Lower boundaries are counted as 1, upper boundaries are counted as -1.
-    other_edge_count: i32,
-    /// Counter which is updated when an edge is crossed by the scanline.
-    /// A single integer can be used for unary boolean operations, a tuple of two integers can be used for
-    /// binary boolean operations, a set of counters can be used for algorithms like connectivity extraction.
     counter: Ctr,
     /// Index of this event in an array.
     /// In a later step of the algorithm this will hold the index of the other event.
@@ -82,8 +73,6 @@ impl<T, Ctr> SweepEvent<T, Ctr>
             mutable: RefCell::new(MutablePart {
                 other_event,
                 prev: Weak::new(),
-                edge_count: 0,
-                other_edge_count: 0,
                 counter: Default::default(),
                 pos: 0,
             }),
@@ -140,23 +129,6 @@ impl<T, Ctr> SweepEvent<T, Ctr>
         }
     }
 
-    pub fn edge_count(&self) -> i32 {
-        self.mutable.borrow().edge_count
-    }
-
-
-    /// Is this event outside of the other polygon?
-    pub fn other_edge_count(&self) -> i32 {
-        self.mutable.borrow().other_edge_count
-    }
-
-    pub fn set_edge_count(&self, edge_count: i32, other_edge_count: i32) {
-        let mut mutable = self.mutable.borrow_mut();
-
-        mutable.edge_count = edge_count;
-        mutable.other_edge_count = other_edge_count;
-    }
-
     pub fn with_counter<F, R>(&self, f: F) -> R
         where F: Fn(&Ctr) -> R {
         f(&self.mutable.borrow().counter)
@@ -165,42 +137,6 @@ impl<T, Ctr> SweepEvent<T, Ctr>
     pub fn with_counter_mut<F, R>(&self, f: F) -> R
         where F: Fn(&mut Ctr) -> R {
         f(&mut self.mutable.borrow_mut().counter)
-    }
-
-    /// Check if this event lies outside the other polygon.
-    pub fn is_outside_other(&self, polygon_semantics: PolygonSemantics) -> bool {
-        let edge_count = self.other_edge_count();
-        match polygon_semantics {
-            PolygonSemantics::Union => edge_count == 0,
-            PolygonSemantics::XOR => edge_count % 2 == 0
-        }
-    }
-
-    /// Check if the event is on an outer boundary of its polygon.
-    pub fn is_outer_boundary(&self, polygon_semantics: PolygonSemantics) -> bool {
-        match polygon_semantics {
-            PolygonSemantics::Union => self.is_upper_boundary(polygon_semantics) || self.is_lower_boundary(polygon_semantics),
-            PolygonSemantics::XOR => true
-        }
-    }
-
-    /// Check if the edge that belongs to this event is an upper boundary of this polygon.
-    pub fn is_upper_boundary(&self, polygon_semantics: PolygonSemantics) -> bool {
-        let edge_count = self.edge_count();
-        match polygon_semantics {
-            PolygonSemantics::Union => edge_count == 0,
-            PolygonSemantics::XOR => edge_count % 2 == 0
-        }
-    }
-
-    /// Check if the edge that belongs to this event is a lower boundary of this polygon.
-    pub fn is_lower_boundary(&self, polygon_semantics: PolygonSemantics) -> bool {
-        let edge_count = self.edge_count();
-        let w = self.edge_weight();
-        w == 1 && match polygon_semantics {
-            PolygonSemantics::Union => edge_count == 1,
-            PolygonSemantics::XOR => edge_count % 2 == 1
-        }
     }
 
     pub fn get_pos(&self) -> usize {

@@ -132,45 +132,6 @@ fn update_counter<T>(event: &Rc<SweepEvent<T, DualCounter>>,
             *ctr = updated_ctr;
         });
     }
-
-    if let Some(prev) = maybe_prev {
-        debug_assert_eq!(event.is_left_event(), prev.is_left_event());
-
-
-        let is_same_type = event.polygon_type == prev.polygon_type;
-
-        let edge_count = if is_same_type {
-            prev.edge_count()
-        } else {
-            prev.other_edge_count()
-        };
-
-        // Update the edge count of the current type.
-        let edge_count = edge_count + event.edge_weight();
-
-        let other_edge_count = if is_same_type {
-            prev.other_edge_count()
-        } else {
-            prev.edge_count()
-        };
-
-        event.set_edge_count(edge_count, other_edge_count);
-
-        // Remember the previous segment for contour-hole attribution.
-        // Note: What matters in the end is the previous segment that also contributes to the result
-        // Hence there is post-processing necessary (done in `connect_edges::filter_events()`).
-        event.set_prev(Rc::downgrade(prev));
-    } else {
-        // This is the first event in the scan line.
-        // First event in the scan line, it is not vertical.
-        // Treat it as a lower boundary that is outside of the other polygon.
-
-        // It is always a lower boundary and outside of the other polygon.
-        // debug_assert!(!event.is_upper_boundary); // Not necessarily true for instance in a hour-glass shape with a self-intersecting polygon.
-
-        // Verticals have an edge weight of 0.
-        event.set_edge_count(event.edge_weight(), 0);
-    }
 }
 
 /// Perform boolean operation.
@@ -249,9 +210,6 @@ pub fn boolean_op<'a, I, T, S, C>(edge_intersection: I,
             PolygonSemantics::Union => other_counter == 0,
             PolygonSemantics::XOR => other_counter % 2 == 0
         };
-
-        // let is_outer_boundary = event.is_outer_boundary(polygon_semantics);
-        // let is_outside_other = event.is_outside_other(polygon_semantics);
 
         is_outer_boundary
             &&
@@ -421,6 +379,13 @@ fn subdivide_segments<T, I, Ctr, UpdateCtrFn>(
                 }
 
                 update_counter(&event, maybe_prev.map(|e| e.deref()));
+                
+                if let Some(prev) = maybe_prev {
+                    // Remember the previous segment for contour-hole attribution.
+                    // Note: What matters in the end is the previous segment that also contributes to the result
+                    // Hence there is post-processing necessary (done in `connect_edges::filter_events()`).
+                    event.set_prev(Rc::downgrade(prev));
+                }
             }
 
             // Insert new event into the scanline.
