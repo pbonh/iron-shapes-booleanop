@@ -43,6 +43,8 @@
 //!
 //! * More systematic approach: [PDF](https://www.boost.org/doc/libs/1_44_0/libs/polygon/doc/GTL_boostcon2009.pdf), [archived](https://web.archive.org/save/https://www.boost.org/doc/libs/1_44_0/libs/polygon/doc/GTL_boostcon2009.pdf)
 
+extern crate iron_shapes;
+
 mod intersection;
 mod sweep_event;
 mod compare_segments;

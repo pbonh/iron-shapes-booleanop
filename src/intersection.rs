@@ -134,6 +134,56 @@ fn update_counter<T>(event: &Rc<SweepEvent<T, DualCounter>>,
     }
 }
 
+
+// Check if the event is contained in the result.
+fn contributes_to_result_binary_booleanop<T: CoordinateType>(event: &SweepEvent<T, DualCounter>, polygon_semantics: PolygonSemantics, operation: Operation) -> bool {
+    debug_assert!(event.is_left_event());
+
+    let (own_counter, other_counter) = {
+        let counter = event.with_counter(|ctr| *ctr);
+
+        match event.polygon_type {
+            PolygonType::Subject => (counter.subject_count, counter.clipping_count),
+            PolygonType::Clipping => (counter.clipping_count, counter.subject_count),
+        }
+    };
+
+    let is_upper_boundary = match polygon_semantics {
+        PolygonSemantics::Union => own_counter == 0,
+        PolygonSemantics::XOR => own_counter % 2 == 0
+    };
+
+    let is_lower_boundary = {
+        let w = event.edge_weight();
+        w == 1 && match polygon_semantics {
+            PolygonSemantics::Union => own_counter == 1,
+            PolygonSemantics::XOR => own_counter % 2 == 1
+        }
+    };
+
+    let is_outer_boundary = match polygon_semantics {
+        PolygonSemantics::Union => is_upper_boundary || is_lower_boundary,
+        PolygonSemantics::XOR => true,
+    };
+
+    let is_outside_other = match polygon_semantics {
+        PolygonSemantics::Union => other_counter == 0,
+        PolygonSemantics::XOR => other_counter % 2 == 0
+    };
+
+    is_outer_boundary
+        &&
+        match operation {
+            Operation::Intersection => !is_outside_other,
+            Operation::Union => is_outside_other,
+            Operation::Difference => match event.polygon_type {
+                PolygonType::Subject => is_outside_other,
+                PolygonType::Clipping => !is_outside_other
+            }
+            Operation::Xor => true,
+        }
+}
+
 /// Perform boolean operation.
 ///
 /// # Example
@@ -175,61 +225,12 @@ pub fn boolean_op<'a, I, T, S, C>(edge_intersection: I,
         |event, prev| update_counter(event, prev),
     );
 
-    // Check if the event is contained in the result.
-    let contributes_to_result_fn = |event: &SweepEvent<T, DualCounter>| -> bool {
-        debug_assert!(event.is_left_event());
-
-        let (own_counter, other_counter) = {
-            let counter = event.with_counter(|ctr| *ctr);
-
-            match event.polygon_type {
-                PolygonType::Subject => (counter.subject_count, counter.clipping_count),
-                PolygonType::Clipping => (counter.clipping_count, counter.subject_count),
-            }
-        };
-
-        let is_upper_boundary = match polygon_semantics {
-            PolygonSemantics::Union => own_counter == 0,
-            PolygonSemantics::XOR => own_counter % 2 == 0
-        };
-
-        let is_lower_boundary = {
-            let w = event.edge_weight();
-            w == 1 && match polygon_semantics {
-                PolygonSemantics::Union => own_counter == 1,
-                PolygonSemantics::XOR => own_counter % 2 == 1
-            }
-        };
-
-        let is_outer_boundary = match polygon_semantics {
-            PolygonSemantics::Union => is_upper_boundary || is_lower_boundary,
-            PolygonSemantics::XOR => true,
-        };
-
-        let is_outside_other = match polygon_semantics {
-            PolygonSemantics::Union => other_counter == 0,
-            PolygonSemantics::XOR => other_counter % 2 == 0
-        };
-
-        is_outer_boundary
-            &&
-            match operation {
-                Operation::Intersection => !is_outside_other,
-                Operation::Union => is_outside_other,
-                Operation::Difference => match event.polygon_type {
-                    PolygonType::Subject => is_outside_other,
-                    PolygonType::Clipping => !is_outside_other
-                }
-                Operation::Xor => true,
-            }
-    };
-
     // Connect the edges into polygons.
     let r = connect_edges(
         &sorted_events,
         operation,
         polygon_semantics,
-        contributes_to_result_fn,
+        |event| contributes_to_result_binary_booleanop(event, polygon_semantics, operation),
     );
 
     MultiPolygon::from_polygons(r)
@@ -379,7 +380,7 @@ fn subdivide_segments<T, I, Ctr, UpdateCtrFn>(
                 }
 
                 update_counter(&event, maybe_prev.map(|e| e.deref()));
-                
+
                 if let Some(prev) = maybe_prev {
                     // Remember the previous segment for contour-hole attribution.
                     // Note: What matters in the end is the previous segment that also contributes to the result
