@@ -115,21 +115,26 @@ fn update_counter<T>(event: &Rc<SweepEvent<T, DualCounter>>,
                      maybe_prev: Option<&Rc<SweepEvent<T, DualCounter>>>)
     where T: CoordinateType,
 {
+    // Update counter.
+    {
+        let mut updated_ctr = maybe_prev.map(|prev| {
+            debug_assert_eq!(event.is_left_event(), prev.is_left_event());
+            prev.with_counter(|ctr| *ctr)
+        })
+            .unwrap_or(Default::default());
+
+        match event.polygon_type {
+            PolygonType::Subject => updated_ctr.subject_count += event.edge_weight(),
+            PolygonType::Clipping => updated_ctr.clipping_count += event.edge_weight(),
+        }
+
+        event.with_counter_mut(|ctr| {
+            *ctr = updated_ctr;
+        });
+    }
+
     if let Some(prev) = maybe_prev {
         debug_assert_eq!(event.is_left_event(), prev.is_left_event());
-
-        {
-            let mut updated_ctr = prev.with_counter(|ctr| *ctr);
-
-            match event.polygon_type {
-                PolygonType::Subject => updated_ctr.subject_count += event.edge_weight(),
-                PolygonType::Clipping => updated_ctr.clipping_count += event.edge_weight(),
-            }
-
-            event.with_counter_mut(|ctr| {
-                *ctr = updated_ctr;
-            });
-        }
 
 
         let is_same_type = event.polygon_type == prev.polygon_type;
@@ -213,8 +218,40 @@ pub fn boolean_op<'a, I, T, S, C>(edge_intersection: I,
     let contributes_to_result_fn = |event: &SweepEvent<T, DualCounter>| -> bool {
         debug_assert!(event.is_left_event());
 
-        let is_outer_boundary = event.is_outer_boundary(polygon_semantics);
-        let is_outside_other = event.is_outside_other(polygon_semantics);
+        let (own_counter, other_counter) = {
+            let counter = event.with_counter(|ctr| *ctr);
+
+            match event.polygon_type {
+                PolygonType::Subject => (counter.subject_count, counter.clipping_count),
+                PolygonType::Clipping => (counter.clipping_count, counter.subject_count),
+            }
+        };
+
+        let is_upper_boundary = match polygon_semantics {
+            PolygonSemantics::Union => own_counter == 0,
+            PolygonSemantics::XOR => own_counter % 2 == 0
+        };
+
+        let is_lower_boundary = {
+            let w = event.edge_weight();
+            w == 1 && match polygon_semantics {
+                PolygonSemantics::Union => own_counter == 1,
+                PolygonSemantics::XOR => own_counter % 2 == 1
+            }
+        };
+
+        let is_outer_boundary = match polygon_semantics {
+            PolygonSemantics::Union => is_upper_boundary || is_lower_boundary,
+            PolygonSemantics::XOR => true,
+        };
+
+        let is_outside_other = match polygon_semantics {
+            PolygonSemantics::Union => other_counter == 0,
+            PolygonSemantics::XOR => other_counter % 2 == 0
+        };
+
+        // let is_outer_boundary = event.is_outer_boundary(polygon_semantics);
+        // let is_outside_other = event.is_outside_other(polygon_semantics);
 
         is_outer_boundary
             &&
