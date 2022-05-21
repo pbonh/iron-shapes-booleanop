@@ -111,7 +111,7 @@ pub struct DualCounter {
 }
 
 /// Compute flags and fields for a segment based on its predecessor in the scan line (if there is one).
-pub fn update_counter<T>(event: &Rc<SweepEvent<T, DualCounter>>,
+fn update_counter<T>(event: &Rc<SweepEvent<T, DualCounter>>,
                          maybe_prev: Option<&Rc<SweepEvent<T, DualCounter>>>)
     where T: CoordinateType,
 {
