@@ -39,7 +39,7 @@ struct Event<T: CoordinateType> {
 
 
 /// Check if the event contributes to the result.
-fn contributes_to_result<T>(event: &SweepEvent<T>,
+fn contributes_to_result<T, Ctr>(event: &SweepEvent<T, Ctr>,
                             operation: Operation,
                             polygon_semantics: PolygonSemantics) -> bool
     where T: CoordinateType,
@@ -62,9 +62,9 @@ fn contributes_to_result<T>(event: &SweepEvent<T>,
 /// Take all the events that contribute to the result.
 /// This depends on the boolean operation to be performed.
 /// Also adjusts the `prev` pointers for hole attribution.
-fn filter_events<T>(sorted_events: &[Rc<SweepEvent<T>>],
+fn filter_events<T, Ctr>(sorted_events: &[Rc<SweepEvent<T, Ctr>>],
                     operation: Operation,
-                    polygon_semantics: PolygonSemantics) -> Vec<Rc<SweepEvent<T>>>
+                    polygon_semantics: PolygonSemantics) -> Vec<Rc<SweepEvent<T, Ctr>>>
     where T: CoordinateType + Debug,
 {
     // Flags that tell whether the event contributes to the result or not.
@@ -112,7 +112,7 @@ fn filter_events<T>(sorted_events: &[Rc<SweepEvent<T>>],
 }
 
 /// Remove duplicate edges which would form empty polygons.
-fn xor_cancel_double_edges<T>(sorted_events: Vec<Rc<SweepEvent<T>>>) -> Vec<Rc<SweepEvent<T>>>
+fn xor_cancel_double_edges<T, Ctr>(sorted_events: Vec<Rc<SweepEvent<T, Ctr>>>) -> Vec<Rc<SweepEvent<T, Ctr>>>
     where T: CoordinateType + Debug {
     // Flags that tell whether the event contributes to the result or not.
     let mut contributes = vec![false; sorted_events.len()];
@@ -178,7 +178,7 @@ fn xor_cancel_double_edges<T>(sorted_events: Vec<Rc<SweepEvent<T>>>) -> Vec<Rc<S
 
 /// Sort the events and insert indices.
 /// Input events must already be filtered such that they only contain relevant events.
-fn order_events<T>(events: &mut Vec<Rc<SweepEvent<T>>>) -> Vec<Event<T>>
+fn order_events<T, Ctr>(events: &mut Vec<Rc<SweepEvent<T, Ctr>>>) -> Vec<Event<T>>
     where
         T: CoordinateType,
 {
@@ -290,7 +290,7 @@ fn next_index<T: CoordinateType>(events: &[Event<T>],
 /// This uses the property events at the same point lie next to each other in the list
 /// of sorted events. This way it is easy to follow the contour: 1) Start at some left event,
 /// 2) go to its right event, 3) from there find a event with the same location.
-pub fn connect_edges<T>(sorted_events: &[Rc<SweepEvent<T>>],
+pub fn connect_edges<T, Ctr>(sorted_events: &[Rc<SweepEvent<T, Ctr>>],
                         operation: Operation,
                         polygon_semantics: PolygonSemantics) -> Vec<Polygon<T>>
     where

@@ -26,26 +26,30 @@ pub enum PolygonType {
 
 /// Mutable data of a sweep event.
 #[derive(Debug, Clone)]
-struct MutablePart<T> {
+struct MutablePart<T, Ctr> {
     /// Reference to the event associated with the other endpoint of the edge.
-    other_event: Weak<SweepEvent<T>>,
+    other_event: Weak<SweepEvent<T, Ctr>>,
     /// Edge below this event. This is used to find polygon-hole relationships.
-    prev: Weak<SweepEvent<T>>,
+    prev: Weak<SweepEvent<T, Ctr>>,
     /// Counts the parity of all edges of the same polygon type (clipping/subject) below this edge.
     /// Lower boundaries are counted as 1, upper boundaries are counted as -1.
     edge_count: i32,
     /// Counts the parity of all edges of the other polygon type (clipping/subject) below this edge.
     /// Lower boundaries are counted as 1, upper boundaries are counted as -1.
     other_edge_count: i32,
+    /// Counter which is updated when an edge is crossed by the scanline.
+    /// A single integer can be used for unary boolean operations, a tuple of two integers can be used for
+    /// binary boolean operations, a set of counters can be used for algorithms like connectivity extraction.
+    counter: Ctr,
     /// Index of this event in an array.
     /// In a later step of the algorithm this will hold the index of the other event.
     pos: usize,
 }
 
 #[derive(Debug, Clone)]
-pub struct SweepEvent<T> {
+pub struct SweepEvent<T, Ctr> {
     /// Mutable part of the sweep event. Borrow checking happens at runtime.
-    mutable: RefCell<MutablePart<T>>,
+    mutable: RefCell<MutablePart<T, Ctr>>,
     /// Point associated with the event. Starting point or end point of the edge.
     pub p: Point<T>,
     /// Original edge from which this SweepEvent was created
@@ -61,23 +65,26 @@ pub struct SweepEvent<T> {
 }
 
 
-impl<T: CoordinateType> SweepEvent<T> {
+impl<T, Ctr> SweepEvent<T, Ctr>
+    where T: CoordinateType,
+          Ctr: Default {
     /// Create a new sweep event wrapped into a `Rc`.
     pub fn new_rc(
         edge_id: usize,
         point: Point<T>,
         other_point: Point<T>,
         is_left_event: bool,
-        other_event: Weak<SweepEvent<T>>,
+        other_event: Weak<SweepEvent<T, Ctr>>,
         polygon_type: PolygonType,
         is_upper_boundary: bool,
-    ) -> Rc<SweepEvent<T>> {
+    ) -> Rc<SweepEvent<T, Ctr>> {
         Rc::new(SweepEvent {
             mutable: RefCell::new(MutablePart {
                 other_event,
                 prev: Weak::new(),
                 edge_count: 0,
                 other_edge_count: 0,
+                counter: Default::default(),
                 pos: 0,
             }),
             p: point,
@@ -88,18 +95,22 @@ impl<T: CoordinateType> SweepEvent<T> {
             edge_id,
         })
     }
+}
+
+impl<T, Ctr> SweepEvent<T, Ctr>
+    where T: CoordinateType {
 
     pub fn is_left_event(&self) -> bool {
         self.is_left_event
     }
 
     /// Get the event that represents the other end point of this segment.
-    pub fn get_other_event(&self) -> Option<Rc<SweepEvent<T>>> {
+    pub fn get_other_event(&self) -> Option<Rc<SweepEvent<T, Ctr>>> {
         self.mutable.borrow().other_event.upgrade()
     }
 
     /// Set the event that represents the other end point of this segment.
-    pub fn set_other_event(&self, other_event: &Rc<SweepEvent<T>>) {
+    pub fn set_other_event(&self, other_event: &Rc<SweepEvent<T, Ctr>>) {
         debug_assert_ne!(self.is_left_event(), other_event.is_left_event());
         self.mutable.borrow_mut().other_event = Rc::downgrade(other_event);
     }
@@ -146,6 +157,16 @@ impl<T: CoordinateType> SweepEvent<T> {
         mutable.other_edge_count = other_edge_count;
     }
 
+    pub fn with_counter<F, R>(&self, f: F) -> R
+        where F: Fn(&Ctr) -> R {
+        f(&self.mutable.borrow().counter)
+    }
+
+    pub fn with_counter_mut<F, R>(&mut self, f: F) -> R
+        where F: Fn(&mut Ctr) -> R {
+        f(&mut self.mutable.borrow_mut().counter)
+    }
+
     /// Check if this event lies outside the other polygon.
     pub fn is_outside_other(&self, polygon_semantics: PolygonSemantics) -> bool {
         let edge_count = self.other_edge_count();
@@ -190,16 +211,15 @@ impl<T: CoordinateType> SweepEvent<T> {
         self.mutable.borrow_mut().pos = pos
     }
 
-
     pub fn get_edge_id(&self) -> usize {
         self.edge_id
     }
 
-    pub fn get_prev(&self) -> Weak<SweepEvent<T>> {
+    pub fn get_prev(&self) -> Weak<Self> {
         self.mutable.borrow().prev.clone()
     }
 
-    pub fn set_prev(&self, prev: Weak<SweepEvent<T>>) {
+    pub fn set_prev(&self, prev: Weak<Self>) {
         self.mutable.borrow_mut().prev = prev;
     }
 
@@ -213,7 +233,7 @@ impl<T: CoordinateType> SweepEvent<T> {
     }
 }
 
-impl<'a, T> PartialEq for SweepEvent<T>
+impl<'a, T, Ctr> PartialEq for SweepEvent<T, Ctr>
     where T: CoordinateType {
     fn eq(&self, other: &Self) -> bool {
         self.cmp(other) == Ordering::Equal
@@ -221,18 +241,18 @@ impl<'a, T> PartialEq for SweepEvent<T>
 }
 
 
-impl<T> Eq for SweepEvent<T>
+impl<T, Ctr> Eq for SweepEvent<T, Ctr>
     where T: CoordinateType {}
 
 
-impl<T> PartialOrd for SweepEvent<T>
+impl<T, Ctr> PartialOrd for SweepEvent<T, Ctr>
     where T: CoordinateType {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl<'a, T> Ord for SweepEvent<T>
+impl<'a, T, Ctr> Ord for SweepEvent<T, Ctr>
     where T: CoordinateType {
     fn cmp(&self, other: &Self) -> Ordering {
         // Note that the order is reversed at the end because this is used in a max-heap.
@@ -299,7 +319,7 @@ mod test {
 
     #[test]
     fn test_prefer_right_events_over_left_events() {
-        let left = SweepEvent::new_rc(
+        let left: Rc<SweepEvent<_, ()>> = SweepEvent::new_rc(
             0,
             (0, 0).into(),
             (0, 0).into(),
@@ -323,7 +343,7 @@ mod test {
 
     #[test]
     fn test_prefer_right_events_over_left_events_in_binary_heap() {
-        let left = SweepEvent::new_rc(
+        let left: Rc<SweepEvent<_, ()>>  = SweepEvent::new_rc(
             0,
             (0, 0).into(),
             (0, 0).into(),
@@ -354,7 +374,7 @@ mod test {
 
     #[test]
     fn test_on_equal_x_sort_y() {
-        let lower = SweepEvent::new_rc(
+        let lower: Rc<SweepEvent<_, ()>> = SweepEvent::new_rc(
             0,
             (0, 0).into(),
             (0, 0).into(),

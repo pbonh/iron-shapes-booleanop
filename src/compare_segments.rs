@@ -54,8 +54,8 @@ fn compare_edges<T: CoordinateType>(first: &Edge<T>, second: &Edge<T>) -> Orderi
 ///
 /// When used correctly the sweep events are sorted by the ascending y-coordinate of their
 /// intersection point with the scan line.
-pub fn compare_events_by_segments<T>(le1: &Rc<SweepEvent<T>>,
-                                     le2: &Rc<SweepEvent<T>>) -> Ordering
+pub fn compare_events_by_segments<T, Ctr>(le1: &Rc<SweepEvent<T, Ctr>>,
+                                     le2: &Rc<SweepEvent<T, Ctr>>) -> Ordering
     where
         T: CoordinateType + Debug,
 {
@@ -150,7 +150,7 @@ mod test {
         left: (f64, f64),
         right: (f64, f64),
         polygon_type: PolygonType,
-    ) -> (Rc<SweepEvent<f64>>, Rc<SweepEvent<f64>>) {
+    ) -> (Rc<SweepEvent<f64, ()>>, Rc<SweepEvent<f64, ()>>) {
         let other = SweepEvent::new_rc(
             event_id,
             right.into(),
@@ -176,7 +176,7 @@ mod test {
 
     fn simple_event_pair(
         left: (f64, f64),
-        right: (f64, f64)) -> (Rc<SweepEvent<f64>>, Rc<SweepEvent<f64>>) {
+        right: (f64, f64)) -> (Rc<SweepEvent<f64, ()>>, Rc<SweepEvent<f64, ()>>) {
         make_event_pair(0, left, right, PolygonType::Clipping)
     }
 

@@ -31,21 +31,22 @@ use crate::btree_scanline::BTreeScanLine;
 use crate::naive_scanline::NaiveScanLine;
 
 /// Insert the edges of the polygons into the event queue.
-fn fill_queue<'a, T, S, C>(
+fn fill_queue<'a, T, S, C, Ctr>(
     subject: S,
     clipping: C,
-) -> BinaryHeap<Rc<SweepEvent<T>>>
+) -> BinaryHeap<Rc<SweepEvent<T, Ctr>>>
     where S: Iterator<Item=&'a Polygon<T>>,
           C: Iterator<Item=&'a Polygon<T>>,
-          T: CoordinateType + 'a {
+          T: CoordinateType + 'a,
+          Ctr: Default {
     let mut event_queue = BinaryHeap::new();
     let mut event_id_generator = (1..).into_iter();
 
     /// Add edges of a polygon to the event queue.
-    fn process_polygon<T: CoordinateType>(event_queue: &mut BinaryHeap<Rc<SweepEvent<T>>>,
-                                          poly: &SimplePolygon<T>,
-                                          polygon_type: PolygonType,
-                                          event_id_generator: &mut RangeFrom<usize>, ) {
+    fn process_polygon<T: CoordinateType, Ctr: Default>(event_queue: &mut BinaryHeap<Rc<SweepEvent<T, Ctr>>>,
+                                                        poly: &SimplePolygon<T>,
+                                                        polygon_type: PolygonType,
+                                                        event_id_generator: &mut RangeFrom<usize>, ) {
         for edge in poly.edges() {
             // Skip degenerate edges.
             if !edge.is_degenerate() {
@@ -105,8 +106,8 @@ fn fill_queue<'a, T, S, C>(
 
 
 /// Compute flags and fields for a segment based on its predecessor in the scan line (if there is one).
-pub fn compute_fields<T>(event: &Rc<SweepEvent<T>>,
-                         maybe_prev: Option<&Rc<SweepEvent<T>>>)
+pub fn compute_fields<T, Ctr>(event: &Rc<SweepEvent<T, Ctr>>,
+                              maybe_prev: Option<&Rc<SweepEvent<T, Ctr>>>)
     where
         T: CoordinateType,
 {
@@ -178,7 +179,7 @@ pub fn boolean_op<'a, I, T, S, C>(edge_intersection: I,
 {
 
     // Prepare the event queue.
-    let mut event_queue = fill_queue(
+    let mut event_queue: BinaryHeap<Rc<SweepEvent<_, ()>>> = fill_queue(
         subject.into_iter(),
         clipping.into_iter(),
     );
@@ -192,6 +193,7 @@ pub fn boolean_op<'a, I, T, S, C>(edge_intersection: I,
 
     // Connect the edges into polygons.
     let r = connect_edges(&sorted_events, operation, polygon_semantics);
+
     MultiPolygon::from_polygons(r)
 }
 
@@ -218,33 +220,33 @@ pub fn edge_intersection_integer<T: PrimInt + Debug>(e1: &Edge<T>, e2: &Edge<T>)
 
 /// Wrap a SweepEvent in order to use another implementation of `Ord` which is needed for the scanline.
 #[derive(Clone)]
-struct ScanlineElement<T>(Rc<SweepEvent<T>>) where T: CoordinateType;
+struct ScanlineElement<T, Ctr>(Rc<SweepEvent<T, Ctr>>) where T: CoordinateType;
 
-impl<T: PartialEq + CoordinateType> PartialEq for ScanlineElement<T> {
+impl<T: PartialEq + CoordinateType, Ctr> PartialEq for ScanlineElement<T, Ctr> {
     fn eq(&self, other: &Self) -> bool {
         self.0.eq(&other.0)
     }
 }
 
-impl<T: PartialEq + CoordinateType> Eq for ScanlineElement<T> {}
+impl<T: PartialEq + CoordinateType, Ctr> Eq for ScanlineElement<T, Ctr> {}
 
-impl<T> Deref for ScanlineElement<T>
+impl<T, Ctr> Deref for ScanlineElement<T, Ctr>
     where T: CoordinateType {
-    type Target = Rc<SweepEvent<T>>;
+    type Target = Rc<SweepEvent<T, Ctr>>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl<T> Ord for ScanlineElement<T>
+impl<T, Ctr> Ord for ScanlineElement<T, Ctr>
     where T: CoordinateType + Debug {
     fn cmp(&self, other: &Self) -> Ordering {
         compare_events_by_segments(self, other)
     }
 }
 
-impl<T> PartialOrd for ScanlineElement<T>
+impl<T, Ctr> PartialOrd for ScanlineElement<T, Ctr>
     where T: CoordinateType + Debug {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(compare_events_by_segments(self, other))
@@ -252,7 +254,7 @@ impl<T> PartialOrd for ScanlineElement<T>
 }
 
 /// Helper function to be used as comparator for the `SplayScanLine`.
-fn compare_scanline_elements<T>(a: &ScanlineElement<T>, b: &ScanlineElement<T>) -> Ordering
+fn compare_scanline_elements<T, Ctr>(a: &ScanlineElement<T, Ctr>, b: &ScanlineElement<T, Ctr>) -> Ordering
     where T: CoordinateType + Debug {
     compare_events_by_segments(a, b)
 }
@@ -260,18 +262,20 @@ fn compare_scanline_elements<T>(a: &ScanlineElement<T>, b: &ScanlineElement<T>) 
 /// Find all intersecting segments and subdivide them such that the set of resulting segments contains
 /// no intersecting segments anymore.
 /// The resulting events are sorted by their coordinates.
-fn subdivide_segments<T: CoordinateType + Debug, I>(
+fn subdivide_segments<T, I, Ctr>(
     edge_intersection: I,
-    event_queue: &mut BinaryHeap<Rc<SweepEvent<T>>>,
-) -> Vec<Rc<SweepEvent<T>>>
-    where I: Fn(&Edge<T>, &Edge<T>) -> EdgeIntersection<T, T, Edge<T>> {
+    event_queue: &mut BinaryHeap<Rc<SweepEvent<T, Ctr>>>,
+) -> Vec<Rc<SweepEvent<T, Ctr>>>
+    where I: Fn(&Edge<T>, &Edge<T>) -> EdgeIntersection<T, T, Edge<T>>,
+          T: CoordinateType + Debug,
+          Ctr: Clone + Default {
     let mut sorted_events = Vec::new();
     // Reserve the minimum amount of storage necessary.
     sorted_events.reserve(event_queue.len());
 
 
     // let mut scan_line = SplayScanLine::new(compare_scanline_elements);
-    let mut scan_line: BTreeScanLine<ScanlineElement<T>> = BTreeScanLine::new();
+    let mut scan_line: BTreeScanLine<ScanlineElement<T, Ctr>> = BTreeScanLine::new();
     // let mut scan_line = NaiveScanLine::new(compare_scanline_elements);
 
     #[cfg(debug)]
@@ -372,14 +376,14 @@ fn subdivide_segments<T: CoordinateType + Debug, I>(
             // TODO use something faster like galloping search?
             let pos_back: isize = sorted_events.iter()
                 .rev() // Search from end of vector.
-                .find_position(|&e: &&Rc<SweepEvent<T>>| e >= &event)
+                .find_position(|&e: &&Rc<SweepEvent<T, Ctr>>| e >= &event)
                 .map(|(index, _value)| index as isize)
                 .unwrap_or(len as isize); // If nothing is found, then place it at the beginning.
 
             let pos = (len as isize - pos_back) as usize;
 
             debug_assert_eq!(pos, sorted_events.iter()
-                .find_position(|&e: &&Rc<SweepEvent<T>>| e <= &event)
+                .find_position(|&e: &&Rc<SweepEvent<T, Ctr>>| e <= &event)
                 .map(|(index, _value)| index)
                 .unwrap_or(len)
             );

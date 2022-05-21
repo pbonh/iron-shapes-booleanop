@@ -18,11 +18,12 @@ use crate::compare_segments::compare_events_by_segments;
 use std::cmp::Ordering;
 
 /// Split a segment into two segments at the intersection point `inter` and push the new events into the queue.
-fn divide_segment<T>(event: &Rc<SweepEvent<T>>,
-                     inter: Point<T>,
-                     queue: &mut BinaryHeap<Rc<SweepEvent<T>>>)
+fn divide_segment<T, Ctr>(event: &Rc<SweepEvent<T, Ctr>>,
+                          inter: Point<T>,
+                          queue: &mut BinaryHeap<Rc<SweepEvent<T, Ctr>>>)
     where
-        T: CoordinateType + Debug
+        T: CoordinateType + Debug,
+        Ctr: Default
 {
     debug_assert!(event.is_left_event());
 
@@ -92,7 +93,6 @@ fn divide_segment<T>(event: &Rc<SweepEvent<T>>,
 
         queue.push(l);
         queue.push(r);
-
     }
 }
 
@@ -102,19 +102,20 @@ fn divide_segment<T>(event: &Rc<SweepEvent<T>>,
 /// `event1` must appear before `event2` in the scan line.
 ///
 /// Returns: `true` if there was an intersection and modification to the queue.
-pub fn possible_intersection<F, I>(
+pub fn possible_intersection<F, I, Ctr>(
     // Function to compute edge intersections.
     edge_intersection_fn: I,
     // Previous event.
-    event1: &Rc<SweepEvent<F>>,
+    event1: &Rc<SweepEvent<F, Ctr>>,
     // Next event.
-    event2: &Rc<SweepEvent<F>>,
+    event2: &Rc<SweepEvent<F, Ctr>>,
     // Event queue.
-    queue: &mut BinaryHeap<Rc<SweepEvent<F>>>,
+    queue: &mut BinaryHeap<Rc<SweepEvent<F, Ctr>>>,
 ) -> bool
     where
         F: CoordinateType + Debug,
-        I: Fn(&Edge<F>, &Edge<F>) -> EdgeIntersection<F, F, Edge<F>>
+        I: Fn(&Edge<F>, &Edge<F>) -> EdgeIntersection<F, F, Edge<F>>,
+        Ctr: Default,
 {
     debug_assert!(event1.is_left_event());
     debug_assert!(event2.is_left_event());
