@@ -48,8 +48,8 @@ pub struct SweepEvent<T> {
     mutable: RefCell<MutablePart<T>>,
     /// Point associated with the event. Starting point or end point of the edge.
     pub p: Point<T>,
-    /// Location of the original partner event. Used in cmp().
-    pub p2_original: Point<T>,
+    /// Original edge from which this SweepEvent was created
+    pub original_edge: Edge<T>,
     /// Is p the left endpoint of the edge (p, other.p)?
     is_left_event: bool,
     /// Type of polygon: either SUBJECT or CLIPPING.
@@ -81,7 +81,7 @@ impl<T: CoordinateType> SweepEvent<T> {
                 pos: 0,
             }),
             p: point,
-            p2_original: other_point,
+            original_edge: Edge::new(point, other_point),
             is_left_event,
             polygon_type,
             is_upper_boundary,
@@ -120,12 +120,12 @@ impl<T: CoordinateType> SweepEvent<T> {
 
     /// Get the original edge associated with this event. Start and end point are sorted.
     pub fn get_original_edge(&self) -> Edge<T> {
-        let edge1 = Edge::new(self.p, self.p2_original);
+        let e = self.original_edge;
 
-        if edge1.start < edge1.end {
-            edge1
+        if e.start < e.end {
+            e
         } else {
-            edge1.reversed()
+            e.reversed()
         }
     }
 
