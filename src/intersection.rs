@@ -104,15 +104,32 @@ fn fill_queue<'a, T, S, C, Ctr>(
     event_queue
 }
 
+#[derive(Copy, Clone, Default)]
+pub struct DualCounter {
+    clipping_count: i32,
+    subject_count: i32,
+}
 
 /// Compute flags and fields for a segment based on its predecessor in the scan line (if there is one).
-pub fn compute_fields<T, Ctr>(event: &Rc<SweepEvent<T, Ctr>>,
-                              maybe_prev: Option<&Rc<SweepEvent<T, Ctr>>>)
-    where
-        T: CoordinateType,
+pub fn update_counter<T>(event: &Rc<SweepEvent<T, DualCounter>>,
+                         maybe_prev: Option<&Rc<SweepEvent<T, DualCounter>>>)
+    where T: CoordinateType,
 {
     if let Some(prev) = maybe_prev {
         debug_assert_eq!(event.is_left_event(), prev.is_left_event());
+
+        {
+            let mut updated_ctr = prev.with_counter(|ctr| *ctr);
+
+            match event.polygon_type {
+                PolygonType::Subject => updated_ctr.subject_count += event.edge_weight(),
+                PolygonType::Clipping => updated_ctr.clipping_count += event.edge_weight(),
+            }
+
+            event.with_counter_mut(|ctr| {
+                *ctr = updated_ctr;
+            });
+        }
 
 
         let is_same_type = event.polygon_type == prev.polygon_type;
@@ -179,7 +196,7 @@ pub fn boolean_op<'a, I, T, S, C>(edge_intersection: I,
 {
 
     // Prepare the event queue.
-    let mut event_queue: BinaryHeap<Rc<SweepEvent<_, ()>>> = fill_queue(
+    let mut event_queue: BinaryHeap<Rc<SweepEvent<_, DualCounter>>> = fill_queue(
         subject.into_iter(),
         clipping.into_iter(),
     );
@@ -189,6 +206,7 @@ pub fn boolean_op<'a, I, T, S, C>(edge_intersection: I,
     let sorted_events = subdivide_segments(
         edge_intersection,
         &mut event_queue,
+        |event, prev| update_counter(event, prev)
     );
 
     // Connect the edges into polygons.
@@ -262,13 +280,16 @@ fn compare_scanline_elements<T, Ctr>(a: &ScanlineElement<T, Ctr>, b: &ScanlineEl
 /// Find all intersecting segments and subdivide them such that the set of resulting segments contains
 /// no intersecting segments anymore.
 /// The resulting events are sorted by their coordinates.
-fn subdivide_segments<T, I, Ctr>(
+fn subdivide_segments<T, I, Ctr, UpdateCtrFn>(
     edge_intersection: I,
     event_queue: &mut BinaryHeap<Rc<SweepEvent<T, Ctr>>>,
+    update_counter: UpdateCtrFn,
 ) -> Vec<Rc<SweepEvent<T, Ctr>>>
     where I: Fn(&Edge<T>, &Edge<T>) -> EdgeIntersection<T, T, Edge<T>>,
           T: CoordinateType + Debug,
-          Ctr: Clone + Default {
+          Ctr: Clone + Default,
+          UpdateCtrFn: Fn(&Rc<SweepEvent<T, Ctr>>, Option<&Rc<SweepEvent<T, Ctr>>>)
+{
     let mut sorted_events = Vec::new();
     // Reserve the minimum amount of storage necessary.
     sorted_events.reserve(event_queue.len());
@@ -337,7 +358,7 @@ fn subdivide_segments<T, I, Ctr>(
                     }
                 }
 
-                compute_fields(&event, maybe_prev.map(|e| e.deref()));
+                update_counter(&event, maybe_prev.map(|e| e.deref()));
             }
 
             // Insert new event into the scanline.
