@@ -8,14 +8,15 @@
 use std::collections::binary_heap::BinaryHeap;
 
 use std::rc::Rc;
+use std::cmp::Ordering;
+use std::fmt::Debug;
+
 use iron_shapes::point::Point;
 use iron_shapes::edge::{Edge, EdgeIntersection};
-
 use iron_shapes::CoordinateType;
+
 use super::sweep_event::*;
-use std::fmt::Debug;
-use crate::compare_segments::compare_events_by_segments;
-use std::cmp::Ordering;
+use super::compare_segments::compare_events_by_segments;
 
 /// Split a segment into two segments at the intersection point `inter` and push the new events into the queue.
 fn divide_segment<T, Ctr, Property>(event: &Rc<SweepEvent<T, Ctr, Property>>,

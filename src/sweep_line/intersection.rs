@@ -14,21 +14,26 @@ use num_rational::Ratio;
 use iron_shapes::multi_polygon::MultiPolygon;
 
 use iron_shapes::CoordinateType;
-use super::sweep_event::*;
-use super::Operation;
 use num_traits::{Float, PrimInt};
-use super::compare_segments::compare_events_by_segments;
-use super::connect_edges::connect_edges;
-use super::possible_intersection::possible_intersection;
 use std::fmt::Debug;
 use std::ops::{RangeFrom, Deref};
 use std::cmp::Ordering;
 use itertools::Itertools;
 use num_integer::Integer;
+
+use crate::Operation;
+
+use super::sweep_event::*;
+
+use crate::connect_edges::connect_edges;
+
+use super::compare_segments::compare_events_by_segments;
+use super::possible_intersection::possible_intersection;
+
 use crate::PolygonSemantics;
-use crate::splay_scanline::SplayScanLine;
-use crate::btree_scanline::BTreeScanLine;
-use crate::naive_scanline::NaiveScanLine;
+use super::splay_scanline::SplayScanLine;
+use super::btree_scanline::BTreeScanLine;
+use super::naive_scanline::NaiveScanLine;
 
 /// Insert the edges of the polygons into the event queue.
 fn fill_queue<'a, T, S, C, Ctr>(

@@ -9,12 +9,13 @@
 //! in the scan line.
 
 use std::rc::Rc;
-use iron_shapes::edge::{Edge, Side};
 use std::cmp::Ordering;
+use std::fmt::Debug;
+
+use iron_shapes::edge::{Edge, Side};
 use iron_shapes::CoordinateType;
 use super::sweep_event::*;
 
-use std::fmt::Debug;
 
 /// Compare two edges.
 /// Returns `Less` if the starting point of `second` is below `first` and `Greater` if it is above.

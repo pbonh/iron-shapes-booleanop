@@ -45,20 +45,14 @@
 
 extern crate iron_shapes;
 
-mod intersection;
-mod sweep_event;
-mod compare_segments;
 mod connect_edges;
-mod possible_intersection;
-mod naive_scanline;
-mod btree_scanline;
-mod splay_scanline;
+mod sweep_line;
 
 use num_rational::{Rational32, Rational64};
 
 // API exports.
-pub use intersection::boolean_op;
-pub use intersection::{edge_intersection_float, edge_intersection_integer, edge_intersection_rational};
+pub use sweep_line::intersection::boolean_op;
+pub use sweep_line::intersection::{edge_intersection_float, edge_intersection_integer, edge_intersection_rational};
 
 use iron_shapes::prelude::{CoordinateType, Polygon, MultiPolygon};
 
