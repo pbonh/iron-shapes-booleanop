@@ -45,9 +45,11 @@ pub fn extract_connectivity<'a, I, T, Polygons, ID>(
     {
         let mut graph: HashMap<ID, HashSet<ID>> = Default::default();
 
+        // Take left events only.
         let left_events = sorted_events.into_iter()
             .filter(|e| e.is_left_event());
 
+        // Check if an edge count signals the inside or the outside of a polygon.
         let is_inside = |count: i32| -> bool {
             match polygon_semantics {
                 PolygonSemantics::Union => count != 0,
@@ -55,30 +57,40 @@ pub fn extract_connectivity<'a, I, T, Polygons, ID>(
             }
         };
 
-        // Create graph edges.
-        for current_event in left_events {
-            debug_assert!(current_event.is_left_event());
-            let shape_id = current_event.property.as_ref().unwrap(); // Left event must have the property.
 
-            current_event.with_counter(|ctr| {
+        // Create iterator of graph edges.
+        // Edges may appear multiple times.
+        let multi_graph_edges = left_events
+            .flat_map(|current_event| {
+                debug_assert!(current_event.is_left_event());
+                let shape_id = current_event.property.as_ref().unwrap().clone(); // Left event must have the property.
+
+                // Take counter from event to own it.
+                // This destroys the structure of the sweep events.
+                let counter = current_event.with_counter_mut(|ctr| {
+                    std::mem::replace(ctr, Default::default())
+                });
 
                 // Look at edge counts and find shapes enclosing the current event.
-                let connected_ids = ctr.counters.iter()
-                    .filter(|(id, _count)| id != &shape_id) // Look only at other polygons.
-                    .filter(|(_id, count)| is_inside(**count))
+                let shape_id_clone = shape_id.clone();
+                let connected_ids = counter.counters.into_iter()
+                    .filter(move |(id, _count)| id != &shape_id_clone) // Look only at other polygons.
+                    .filter(|(_id, count)| is_inside(*count))
                     .map(|(id, _)| id);
 
-                // Create graph edges.
-                for connected_id in connected_ids {
-                    graph.entry(shape_id.clone())
-                        .or_insert(Default::default())
-                        .insert(connected_id.clone());
-                    // Insert reverse edge.
-                    graph.entry(connected_id.clone())
-                        .or_insert(Default::default())
-                        .insert(shape_id.clone());
-                }
+                connected_ids
+                    .map(move |id| (shape_id.clone(), id))
             });
+
+        // Insert graph edges.
+        for (id_a, id_b) in multi_graph_edges {
+            graph.entry(id_a.clone())
+                .or_insert(Default::default())
+                .insert(id_b.clone());
+            // Insert reverse edge.
+            graph.entry(id_b)
+                .or_insert(Default::default())
+                .insert(id_a);
         }
 
         graph
