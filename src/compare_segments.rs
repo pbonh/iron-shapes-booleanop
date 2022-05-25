@@ -54,8 +54,8 @@ fn compare_edges<T: CoordinateType>(first: &Edge<T>, second: &Edge<T>) -> Orderi
 ///
 /// When used correctly the sweep events are sorted by the ascending y-coordinate of their
 /// intersection point with the scan line.
-pub fn compare_events_by_segments<T, Ctr>(le1: &Rc<SweepEvent<T, Ctr>>,
-                                     le2: &Rc<SweepEvent<T, Ctr>>) -> Ordering
+pub fn compare_events_by_segments<T, Ctr, P>(le1: &Rc<SweepEvent<T, Ctr, P>>,
+                                     le2: &Rc<SweepEvent<T, Ctr, P>>) -> Ordering
     where
         T: CoordinateType + Debug,
 {

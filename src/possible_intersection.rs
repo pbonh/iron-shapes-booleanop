@@ -18,12 +18,13 @@ use crate::compare_segments::compare_events_by_segments;
 use std::cmp::Ordering;
 
 /// Split a segment into two segments at the intersection point `inter` and push the new events into the queue.
-fn divide_segment<T, Ctr>(event: &Rc<SweepEvent<T, Ctr>>,
-                          inter: Point<T>,
-                          queue: &mut BinaryHeap<Rc<SweepEvent<T, Ctr>>>)
+fn divide_segment<T, Ctr, Property>(event: &Rc<SweepEvent<T, Ctr, Property>>,
+                                    inter: Point<T>,
+                                    queue: &mut BinaryHeap<Rc<SweepEvent<T, Ctr, Property>>>)
     where
         T: CoordinateType + Debug,
-        Ctr: Default
+        Ctr: Default,
+        Property: Clone,
 {
     debug_assert!(event.is_left_event());
 
@@ -53,16 +54,18 @@ fn divide_segment<T, Ctr>(event: &Rc<SweepEvent<T, Ctr>>,
         debug_assert!(event.p < inter && inter < other_event.p,
                       "Intersection point must lie on the edge but not on the end-points.");
 
-        let r = SweepEvent::new_rc(
+        let r = SweepEvent::new_rc_with_property(
             event.get_edge_id(),
             inter,
             event.p,
             false,
             Rc::downgrade(&event),
             event.polygon_type,
-            event.is_upper_boundary);
+            event.is_upper_boundary,
+            None,
+        );
 
-        let l = SweepEvent::new_rc(
+        let l = SweepEvent::new_rc_with_property(
             event.get_edge_id(),
             inter,
             other_event.p,
@@ -70,6 +73,7 @@ fn divide_segment<T, Ctr>(event: &Rc<SweepEvent<T, Ctr>>,
             Rc::downgrade(&other_event),
             event.polygon_type,
             event.is_upper_boundary,
+            event.property.clone(),
         );
 
         debug_assert!(event.p <= r.p);
@@ -102,20 +106,21 @@ fn divide_segment<T, Ctr>(event: &Rc<SweepEvent<T, Ctr>>,
 /// `event1` must appear before `event2` in the scan line.
 ///
 /// Returns: `true` if there was an intersection and modification to the queue.
-pub fn possible_intersection<F, I, Ctr>(
+pub fn possible_intersection<F, I, Ctr, P>(
     // Function to compute edge intersections.
     edge_intersection_fn: I,
     // Previous event.
-    event1: &Rc<SweepEvent<F, Ctr>>,
+    event1: &Rc<SweepEvent<F, Ctr, P>>,
     // Next event.
-    event2: &Rc<SweepEvent<F, Ctr>>,
+    event2: &Rc<SweepEvent<F, Ctr, P>>,
     // Event queue.
-    queue: &mut BinaryHeap<Rc<SweepEvent<F, Ctr>>>,
+    queue: &mut BinaryHeap<Rc<SweepEvent<F, Ctr, P>>>,
 ) -> bool
     where
         F: CoordinateType + Debug,
         I: Fn(&Edge<F>, &Edge<F>) -> EdgeIntersection<F, F, Edge<F>>,
         Ctr: Default,
+        P: Clone
 {
     debug_assert!(event1.is_left_event());
     debug_assert!(event2.is_left_event());

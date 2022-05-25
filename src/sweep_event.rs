@@ -54,9 +54,10 @@ pub struct SweepEvent<T, Ctr, Property = ()> {
     /// Unique ID of the edge. Used to break ties and guarantee ordering for overlapping edges.
     pub edge_id: usize,
     /// Property associated with this event.
+    /// Only left events store a property. The field is 'None' for right events.
     /// Can be used to store an ID of the polygon.
     /// For binary boolean operations this field is used to store the polygon type ('clipping' or 'subject').
-    pub property: Property
+    pub property: Option<Property>
 }
 
 
@@ -86,7 +87,7 @@ impl<T, Ctr> SweepEvent<T, Ctr, ()>
             polygon_type,
             is_upper_boundary,
             edge_id,
-            property: ()
+            property: Some(())
         })
     }
 }
@@ -103,7 +104,7 @@ impl<T, Ctr, Property> SweepEvent<T, Ctr, Property>
         other_event: Weak<SweepEvent<T, Ctr, Property>>,
         polygon_type: PolygonType,
         is_upper_boundary: bool,
-        property: Property,
+        property: Option<Property>,
     ) -> Rc<SweepEvent<T, Ctr, Property>> {
 
         Rc::new(SweepEvent {
@@ -125,7 +126,7 @@ impl<T, Ctr, Property> SweepEvent<T, Ctr, Property>
     }
 }
 
-impl<T, Ctr> SweepEvent<T, Ctr>
+impl<T, Ctr, Property> SweepEvent<T, Ctr, Property>
     where T: CoordinateType {
 
     pub fn is_left_event(&self) -> bool {
@@ -133,12 +134,12 @@ impl<T, Ctr> SweepEvent<T, Ctr>
     }
 
     /// Get the event that represents the other end point of this segment.
-    pub fn get_other_event(&self) -> Option<Rc<SweepEvent<T, Ctr>>> {
+    pub fn get_other_event(&self) -> Option<Rc<Self>> {
         self.mutable.borrow().other_event.upgrade()
     }
 
     /// Set the event that represents the other end point of this segment.
-    pub fn set_other_event(&self, other_event: &Rc<SweepEvent<T, Ctr>>) {
+    pub fn set_other_event(&self, other_event: &Rc<Self>) {
         debug_assert_ne!(self.is_left_event(), other_event.is_left_event());
         self.mutable.borrow_mut().other_event = Rc::downgrade(other_event);
     }
@@ -208,7 +209,7 @@ impl<T, Ctr> SweepEvent<T, Ctr>
     }
 }
 
-impl<'a, T, Ctr> PartialEq for SweepEvent<T, Ctr>
+impl<'a, T, Ctr, P> PartialEq for SweepEvent<T, Ctr, P>
     where T: CoordinateType {
     fn eq(&self, other: &Self) -> bool {
         self.cmp(other) == Ordering::Equal
@@ -216,18 +217,18 @@ impl<'a, T, Ctr> PartialEq for SweepEvent<T, Ctr>
 }
 
 
-impl<T, Ctr> Eq for SweepEvent<T, Ctr>
+impl<T, Ctr, P> Eq for SweepEvent<T, Ctr, P>
     where T: CoordinateType {}
 
 
-impl<T, Ctr> PartialOrd for SweepEvent<T, Ctr>
+impl<T, Ctr, P> PartialOrd for SweepEvent<T, Ctr, P>
     where T: CoordinateType {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl<'a, T, Ctr> Ord for SweepEvent<T, Ctr>
+impl<'a, T, Ctr, P> Ord for SweepEvent<T, Ctr, P>
     where T: CoordinateType {
     fn cmp(&self, other: &Self) -> Ordering {
         // Note that the order is reversed at the end because this is used in a max-heap.
