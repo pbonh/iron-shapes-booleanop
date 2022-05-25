@@ -50,7 +50,7 @@ pub struct SweepEvent<T, Ctr, Property = ()> {
     /// Is this edge an upper boundary of the input polygon?
     pub is_upper_boundary: bool,
     /// Unique ID of the edge. Used to break ties and guarantee ordering for overlapping edges.
-    pub edge_id: usize,
+    edge_id: usize,
     /// Property associated with this event.
     /// Only left events store a property. The field is 'None' for right events.
     /// Can be used to store an ID of the polygon.
@@ -254,7 +254,7 @@ impl<'a, T, Ctr, P> Ord for SweepEvent<T, Ctr, P>
                                 // Lower boundaries before upper boundaries
                                 // then break ties by the edge_id.
                                 self.is_upper_boundary.cmp(&other.is_upper_boundary)
-                                    .then_with(|| self.edge_id.cmp(&other.edge_id))
+                                    .then_with(|| self.get_edge_id().cmp(&other.get_edge_id()))
                             }
                         }
                     }
