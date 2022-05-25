@@ -58,10 +58,11 @@ pub struct SweepEvent<T, Ctr, Property = ()> {
     pub property: Option<Property>
 }
 
-
+#[cfg(test)]
 impl<T, Ctr> SweepEvent<T, Ctr, ()>
     where T: CoordinateType,
           Ctr: Default {
+
     /// Create a new sweep event wrapped into a `Rc`.
     pub fn new_rc(
         edge_id: usize,
