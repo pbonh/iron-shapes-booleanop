@@ -7,14 +7,13 @@
 
 use std::collections::binary_heap::BinaryHeap;
 
-use std::rc::{Rc, Weak};
-use iron_shapes::polygon::{Polygon, SimplePolygon};
+use std::rc::Rc;
+use iron_shapes::polygon::Polygon;
 use iron_shapes::edge::{Edge, EdgeIntersection};
 use iron_shapes::multi_polygon::MultiPolygon;
 
 use iron_shapes::CoordinateType;
 use std::fmt::Debug;
-use std::ops::{RangeFrom};
 
 use crate::Operation;
 
@@ -24,81 +23,6 @@ use super::sweep_line::intersection::subdivide_segments;
 use crate::connect_edges::connect_edges;
 
 use crate::PolygonSemantics;
-
-
-/// Insert the edges of the polygons into the event queue.
-fn fill_queue<'a, T, S, C, Ctr>(
-    subject: S,
-    clipping: C,
-) -> BinaryHeap<Rc<SweepEvent<T, Ctr, PolygonType>>>
-    where S: Iterator<Item=&'a Polygon<T>>,
-          C: Iterator<Item=&'a Polygon<T>>,
-          T: CoordinateType + 'a,
-          Ctr: Default {
-    let mut event_queue = BinaryHeap::new();
-    let mut event_id_generator = (1..).into_iter();
-
-    /// Add edges of a polygon to the event queue.
-    fn process_polygon<T: CoordinateType, Ctr: Default>(event_queue: &mut BinaryHeap<Rc<SweepEvent<T, Ctr, PolygonType>>>,
-                                                        poly: &SimplePolygon<T>,
-                                                        polygon_type: PolygonType,
-                                                        event_id_generator: &mut RangeFrom<usize>, ) {
-        for edge in poly.edges() {
-            // Skip degenerate edges.
-            if !edge.is_degenerate() {
-                let edge_id = event_id_generator.next().unwrap();
-                let event_a_is_left = edge.start < edge.end;
-
-                // Upper boundary edges are directed from right to left.
-                let is_upper_boundary = edge.end < edge.start;
-
-                let event_a = SweepEvent::new_rc_with_property(
-                    edge_id,
-                    edge.start,
-                    edge.end,
-                    event_a_is_left,
-                    Weak::new(),
-                    is_upper_boundary,
-                    Some(polygon_type),
-                );
-                let event_b = SweepEvent::new_rc_with_property(
-                    edge_id,
-                    edge.end,
-                    edge.start,
-                    !event_a_is_left,
-                    Rc::downgrade(&event_a),
-                    is_upper_boundary,
-                    Some(polygon_type),
-                );
-
-                event_a.set_other_event(&event_b);
-
-                event_queue.push(event_a);
-                event_queue.push(event_b);
-            }
-        }
-    }
-
-    // Subject polygons.
-    for p in subject {
-        process_polygon(&mut event_queue, &p.exterior, PolygonType::Subject, &mut event_id_generator);
-        for i in &p.interiors {
-            // Holes
-            process_polygon(&mut event_queue, i, PolygonType::Subject, &mut event_id_generator);
-        }
-    }
-
-    // Clipping polygons.
-    for p in clipping {
-        process_polygon(&mut event_queue, &p.exterior, PolygonType::Clipping, &mut event_id_generator);
-        for i in &p.interiors {
-            // Holes
-            process_polygon(&mut event_queue, i, PolygonType::Clipping, &mut event_id_generator);
-        }
-    }
-
-    event_queue
-}
 
 #[derive(Copy, Clone, Default)]
 pub struct DualCounter {
@@ -214,9 +138,12 @@ pub fn boolean_op<'a, I, T, S, C>(edge_intersection: I,
 {
 
     // Prepare the event queue.
-    let mut event_queue: BinaryHeap<Rc<SweepEvent<_, DualCounter, PolygonType>>> = fill_queue(
-        subject.into_iter(),
-        clipping.into_iter(),
+    let mut event_queue : BinaryHeap<Rc<SweepEvent<_, DualCounter, PolygonType>>> = crate::init_events::fill_queue(
+      subject.into_iter()
+          .map(|p| (p, PolygonType::Subject))
+          .chain(clipping.into_iter()
+              .map(|p| (p, PolygonType::Clipping))
+          )
     );
 
     // Compute the edge intersections, the result is a set of sorted non-intersecting edges stored
