@@ -1,0 +1,39 @@
+// SPDX-FileCopyrightText: 2022 Thomas Kramer
+//
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
+//! Tests for connectivity extraction.
+
+extern crate iron_shapes_booleanop;
+
+#[cfg(test)]
+mod booleanop {
+    extern crate rand;
+
+    use iron_shapes_booleanop::connectivity_extraction::*;
+    use iron_shapes::prelude::*;
+    use iron_shapes::traits::Translate;
+    use iron_shapes_booleanop::*;
+    use std::collections::HashSet;
+
+    #[test]
+    fn test_simple_connectivity_extraction() {
+
+        let p0 = Polygon::from(vec![(0f64, 0.), (2., 0.), (2., 2.), (0., 2.)]);
+        let p1 = p0.translate((1., 1.).into());
+        let p2 = p0.translate((0., 100.).into()); // Far away, not touching anything.
+
+        let polygons = vec![p0, p1, p2];
+
+        let connectivity_graph = extract_connectivity(
+            edge_intersection_float,
+            polygons.iter().enumerate(),
+            PolygonSemantics::Union,
+        );
+
+        assert_eq!(connectivity_graph.get(&0), Some(&HashSet::from([1])));
+        assert_eq!(connectivity_graph.get(&1), Some(&HashSet::from([0])));
+        assert_eq!(connectivity_graph.get(&2), None);
+
+    }
+}

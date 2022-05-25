@@ -150,13 +150,13 @@ impl<T, Ctr, Property> SweepEvent<T, Ctr, Property>
         }
     }
 
-    pub fn with_counter<F, R>(&self, f: F) -> R
-        where F: Fn(&Ctr) -> R {
+    pub fn with_counter<F, R>(&self, mut f: F) -> R
+        where F: FnMut(&Ctr) -> R {
         f(&self.mutable.borrow().counter)
     }
 
-    pub fn with_counter_mut<F, R>(&self, f: F) -> R
-        where F: Fn(&mut Ctr) -> R {
+    pub fn with_counter_mut<F, R>(&self, mut f: F) -> R
+        where F: FnMut(&mut Ctr) -> R {
         f(&mut self.mutable.borrow_mut().counter)
     }
 

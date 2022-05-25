@@ -48,7 +48,7 @@ extern crate iron_shapes;
 mod connect_edges;
 mod sweep_line;
 mod booleanop;
-mod connectivity_extraction;
+pub mod connectivity_extraction;
 mod init_events;
 
 use num_rational::{Rational32, Rational64};

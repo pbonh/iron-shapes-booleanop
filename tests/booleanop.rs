@@ -6,7 +6,7 @@
 //! Tests for boolean operations.
 
 #[cfg(test)]
-mod test {
+mod booleanop {
     extern crate rand;
 
     use iron_shapes_booleanop::*;
