@@ -17,6 +17,162 @@ use iron_shapes::point::Point;
 use iron_shapes::simple_polygon::SimplePolygon;
 use crate::PolygonSemantics;
 
+
+/// Given the processed and sorted events, connect the edges to polygons.
+///
+/// This uses the property events at the same point lie next to each other in the list
+/// of sorted events. This way it is easy to follow the contour: 1) Start at some left event,
+/// 2) go to its right event, 3) from there find a event with the same location.
+pub fn connect_edges<T, Ctr, P, ContributesToResultFn>(
+    sorted_events: &[Rc<SweepEvent<T, Ctr, P>>],
+    operation: Operation,
+    polygon_semantics: PolygonSemantics,
+    contributes_to_result: ContributesToResultFn) -> Vec<Polygon<T>>
+    where
+        T: CoordinateType + Debug,
+        ContributesToResultFn: Fn(&SweepEvent<T, Ctr, P>) -> bool
+{
+    let mut relevant_events = filter_events(sorted_events, contributes_to_result);
+
+    if operation == Operation::Xor || polygon_semantics == PolygonSemantics::XOR {
+        relevant_events = xor_cancel_double_edges(relevant_events);
+    }
+
+    let mut events = order_events(&mut relevant_events);
+
+    debug_assert!(events.len() % 2 == 0, "Expect an even number of events.");
+
+    // Store found contours.
+    let mut polygons: Vec<Polygon<T>> = Vec::new();
+
+    // Remember which events have been processed.
+    let mut processed: Vec<bool> = vec![false; events.len()];
+
+    for i in 0..events.len() {
+        // Find the next unprocessed event from the left.
+
+        if processed[i] {
+            continue;
+        }
+
+        // Sanity check: There must be an even number of unprocessed events,
+        // because events always come in pairs.
+        debug_assert!(
+            processed
+                .iter()
+                .filter(|&&b| !b)
+                .count() % 2 == 0,
+            "Expect to have an even number of non-processed events."
+        );
+
+        // Sanity check: There must be as many right events as left events among the unprocessed events.
+        debug_assert!(
+            (0..events.len())
+                .into_iter()
+                .filter_map(|i| if processed[i] { None } else {
+                    if events[i].is_left_event {
+                        Some(1)
+                    } else {
+                        Some(-1)
+                    }
+                })
+                .fold(0, |a, b| a + b) == 0,
+            "Expect to have the same amount of left and right events."
+        );
+
+        // Buffer for polygon.
+        let mut contour = Vec::new();
+
+        let mut pointer = i;
+        let initial_event = &events[i];
+
+        // Find contour index if this is a hole.
+
+        let is_hull = initial_event.prev_index
+            .map(|prev| {
+                let prev_event = &events[prev];
+                if prev_event.is_upper_boundary {
+                    !prev_event.is_hole
+                } else {
+                    // A hole inside a hole is a hull.
+                    prev_event.is_hole
+                }
+            })
+            .unwrap_or(true);
+        let is_hole = !is_hull;
+
+        let polygon_id = if is_hull {
+            polygons.len()
+        } else {
+            initial_event.prev_index
+                .map(|prev| events[prev].contour_id)
+                // If there is no previous segment, this is a contour and not a hole.
+                // Create a new polygon id.
+                .unwrap_or(polygons.len())
+        };
+
+        let initial_point = initial_event.p;
+        debug_assert!(initial_event.is_left_event, "Initial event is expected to be a left event.");
+
+        // Follow the lines until the contour is closed.
+        loop {
+            let other_pointer = {
+                // Propagate fields to the right event.
+                let e = &mut events[pointer];
+                e.contour_id = polygon_id;
+                e.is_hole = is_hole;
+                e.other_index
+            };
+            {
+                let other = &mut events[other_pointer];
+                other.contour_id = polygon_id;
+                other.is_hole = is_hole;
+            }
+
+            if events[pointer].p.x > events[other_pointer].p.x {
+                // This is an upper boundary of the contour.
+                events[pointer].is_upper_boundary = true;
+                events[other_pointer].is_upper_boundary = true;
+            }
+
+            let event = &events[pointer];
+            let other_event = &events[other_pointer];
+
+            contour.push(event.p);
+
+            processed[pointer] = true;
+            processed[other_pointer] = true;
+
+            debug_assert!(event.is_left_event ^ other_event.is_left_event,
+                          "Need to get exactly one left event and one right event.");
+
+            if other_event.p == initial_point {
+                // Contour is closed.
+                break;
+            }
+
+            // Get the start of an adjacent edge.
+            if let Some(next_index) = next_index(&events, other_pointer, &processed) {
+                pointer = next_index;
+            } else {
+                break;
+            }
+        }
+
+
+        if polygon_id < polygons.len() {
+            // Add hole to existing polygon.
+            let hole = SimplePolygon::new(contour).normalized_orientation::<T>();
+            polygons[polygon_id].interiors.push(hole);
+        } else {
+            let p = Polygon::new(contour);
+            polygons.push(p);
+        }
+    }
+
+    polygons
+}
+
 #[derive(Debug, Clone, PartialEq)]
 struct Event<T: CoordinateType> {
     /// Index of this event in the vector where it is stored.
@@ -263,157 +419,3 @@ fn next_index<T: CoordinateType>(events: &[Event<T>],
     }
 }
 
-/// Given the processed and sorted events, connect the edges to polygons.
-///
-/// This uses the property events at the same point lie next to each other in the list
-/// of sorted events. This way it is easy to follow the contour: 1) Start at some left event,
-/// 2) go to its right event, 3) from there find a event with the same location.
-pub fn connect_edges<T, Ctr, P, ContributesToResultFn>(
-    sorted_events: &[Rc<SweepEvent<T, Ctr, P>>],
-    operation: Operation,
-    polygon_semantics: PolygonSemantics,
-    contributes_to_result: ContributesToResultFn) -> Vec<Polygon<T>>
-    where
-        T: CoordinateType + Debug,
-        ContributesToResultFn: Fn(&SweepEvent<T, Ctr, P>) -> bool
-{
-    let mut relevant_events = filter_events(sorted_events, contributes_to_result);
-
-    if operation == Operation::Xor || polygon_semantics == PolygonSemantics::XOR {
-        relevant_events = xor_cancel_double_edges(relevant_events);
-    }
-
-    let mut events = order_events(&mut relevant_events);
-
-    debug_assert!(events.len() % 2 == 0, "Expect an even number of events.");
-
-    // Store found contours.
-    let mut polygons: Vec<Polygon<T>> = Vec::new();
-
-    // Remember which events have been processed.
-    let mut processed: Vec<bool> = vec![false; events.len()];
-
-    for i in 0..events.len() {
-        // Find the next unprocessed event from the left.
-
-        if processed[i] {
-            continue;
-        }
-
-        // Sanity check: There must be an even number of unprocessed events,
-        // because events always come in pairs.
-        debug_assert!(
-            processed
-                .iter()
-                .filter(|&&b| !b)
-                .count() % 2 == 0,
-            "Expect to have an even number of non-processed events."
-        );
-
-        // Sanity check: There must be as many right events as left events among the unprocessed events.
-        debug_assert!(
-            (0..events.len())
-                .into_iter()
-                .filter_map(|i| if processed[i] { None } else {
-                    if events[i].is_left_event {
-                        Some(1)
-                    } else {
-                        Some(-1)
-                    }
-                })
-                .fold(0, |a, b| a + b) == 0,
-            "Expect to have the same amount of left and right events."
-        );
-
-        // Buffer for polygon.
-        let mut contour = Vec::new();
-
-        let mut pointer = i;
-        let initial_event = &events[i];
-
-        // Find contour index if this is a hole.
-
-        let is_hull = initial_event.prev_index
-            .map(|prev| {
-                let prev_event = &events[prev];
-                if prev_event.is_upper_boundary {
-                    !prev_event.is_hole
-                } else {
-                    // A hole inside a hole is a hull.
-                    prev_event.is_hole
-                }
-            })
-            .unwrap_or(true);
-        let is_hole = !is_hull;
-
-        let polygon_id = if is_hull {
-            polygons.len()
-        } else {
-            initial_event.prev_index
-                .map(|prev| events[prev].contour_id)
-                // If there is no previous segment, this is a contour and not a hole.
-                // Create a new polygon id.
-                .unwrap_or(polygons.len())
-        };
-
-        let initial_point = initial_event.p;
-        debug_assert!(initial_event.is_left_event, "Initial event is expected to be a left event.");
-
-        // Follow the lines until the contour is closed.
-        loop {
-            let other_pointer = {
-                // Propagate fields to the right event.
-                let e = &mut events[pointer];
-                e.contour_id = polygon_id;
-                e.is_hole = is_hole;
-                e.other_index
-            };
-            {
-                let other = &mut events[other_pointer];
-                other.contour_id = polygon_id;
-                other.is_hole = is_hole;
-            }
-
-            if events[pointer].p.x > events[other_pointer].p.x {
-                // This is an upper boundary of the contour.
-                events[pointer].is_upper_boundary = true;
-                events[other_pointer].is_upper_boundary = true;
-            }
-
-            let event = &events[pointer];
-            let other_event = &events[other_pointer];
-
-            contour.push(event.p);
-
-            processed[pointer] = true;
-            processed[other_pointer] = true;
-
-            debug_assert!(event.is_left_event ^ other_event.is_left_event,
-                          "Need to get exactly one left event and one right event.");
-
-            if other_event.p == initial_point {
-                // Contour is closed.
-                break;
-            }
-
-            // Get the start of an adjacent edge.
-            if let Some(next_index) = next_index(&events, other_pointer, &processed) {
-                pointer = next_index;
-            } else {
-                break;
-            }
-        }
-
-
-        if polygon_id < polygons.len() {
-            // Add hole to existing polygon.
-            let hole = SimplePolygon::new(contour).normalized_orientation::<T>();
-            polygons[polygon_id].interiors.push(hole);
-        } else {
-            let p = Polygon::new(contour);
-            polygons.push(p);
-        }
-    }
-
-    polygons
-}
