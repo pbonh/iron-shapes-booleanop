@@ -26,11 +26,11 @@ pub enum PolygonType {
 
 /// Mutable data of a sweep event.
 #[derive(Debug, Clone)]
-struct MutablePart<T, Ctr> {
+struct MutablePart<T, Ctr, Property> {
     /// Reference to the event associated with the other endpoint of the edge.
-    other_event: Weak<SweepEvent<T, Ctr>>,
+    other_event: Weak<SweepEvent<T, Ctr, Property>>,
     /// Edge below this event. This is used to find polygon-hole relationships.
-    prev: Weak<SweepEvent<T, Ctr>>,
+    prev: Weak<SweepEvent<T, Ctr, Property>>,
     counter: Ctr,
     /// Index of this event in an array.
     /// In a later step of the algorithm this will hold the index of the other event.
@@ -38,9 +38,9 @@ struct MutablePart<T, Ctr> {
 }
 
 #[derive(Debug, Clone)]
-pub struct SweepEvent<T, Ctr> {
+pub struct SweepEvent<T, Ctr, Property = ()> {
     /// Mutable part of the sweep event. Borrow checking happens at runtime.
-    mutable: RefCell<MutablePart<T, Ctr>>,
+    mutable: RefCell<MutablePart<T, Ctr, Property>>,
     /// Point associated with the event. Starting point or end point of the edge.
     pub p: Point<T>,
     /// Original edge from which this SweepEvent was created
@@ -53,10 +53,14 @@ pub struct SweepEvent<T, Ctr> {
     pub is_upper_boundary: bool,
     /// Unique ID of the edge. Used to break ties and guarantee ordering for overlapping edges.
     pub edge_id: usize,
+    /// Property associated with this event.
+    /// Can be used to store an ID of the polygon.
+    /// For binary boolean operations this field is used to store the polygon type ('clipping' or 'subject').
+    pub property: Property
 }
 
 
-impl<T, Ctr> SweepEvent<T, Ctr>
+impl<T, Ctr> SweepEvent<T, Ctr, ()>
     where T: CoordinateType,
           Ctr: Default {
     /// Create a new sweep event wrapped into a `Rc`.
@@ -82,7 +86,42 @@ impl<T, Ctr> SweepEvent<T, Ctr>
             polygon_type,
             is_upper_boundary,
             edge_id,
+            property: ()
         })
+    }
+}
+
+impl<T, Ctr, Property> SweepEvent<T, Ctr, Property>
+    where T: CoordinateType,
+          Ctr: Default {
+    /// Create a new sweep event wrapped into a `Rc`.
+    pub fn new_rc_with_property(
+        edge_id: usize,
+        point: Point<T>,
+        other_point: Point<T>,
+        is_left_event: bool,
+        other_event: Weak<SweepEvent<T, Ctr, Property>>,
+        polygon_type: PolygonType,
+        is_upper_boundary: bool,
+        property: Property,
+    ) -> Rc<SweepEvent<T, Ctr, Property>> {
+
+        Rc::new(SweepEvent {
+            mutable: RefCell::new(MutablePart {
+                other_event,
+                prev: Weak::new(),
+                counter: Default::default(),
+                pos: 0,
+            }),
+            p: point,
+            original_edge: Edge::new(point, other_point),
+            is_left_event,
+            polygon_type,
+            is_upper_boundary,
+            edge_id,
+            property
+        })
+
     }
 }
 
