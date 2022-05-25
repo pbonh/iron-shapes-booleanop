@@ -39,4 +39,42 @@ mod booleanop {
         assert_eq!(connectivity_graph.get(&2), None);
 
     }
+
+    #[test]
+    fn test_connectivity_of_touching_polygons() {
+
+        let p0 = Polygon::from(vec![(0f64, 0.), (2., 0.), (2., 2.), (0., 2.)]);
+        let p1 = p0.translate((0., 2.).into());
+
+        let polygons = vec![p0, p1];
+
+        let connectivity_graph = extract_connectivity(
+            edge_intersection_float,
+            polygons.iter().enumerate(),
+            PolygonSemantics::Union,
+        );
+
+
+        assert_eq!(connectivity_graph.get(&0), Some(&HashSet::from([1])));
+        assert_eq!(connectivity_graph.get(&1), Some(&HashSet::from([0])));
+    }
+
+    #[test]
+    fn test_connectivity_of_corner_kissing_polygons() {
+
+        let p0 = Polygon::from(vec![(0f64, 0.), (2., 0.), (2., 2.), (0., 2.)]);
+        let p1 = p0.translate((2., 2.).into());
+
+        let polygons = vec![p0, p1];
+
+        let connectivity_graph = extract_connectivity(
+            edge_intersection_float,
+            polygons.iter().enumerate(),
+            PolygonSemantics::Union,
+        );
+
+
+        assert_eq!(connectivity_graph.get(&0), None);
+        assert_eq!(connectivity_graph.get(&1), None);
+    }
 }
