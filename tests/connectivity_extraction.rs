@@ -31,8 +31,11 @@ mod booleanop {
             PolygonSemantics::Union,
         );
 
+        // p0 and p1 are connected.
         assert_eq!(connectivity_graph.get(&0), Some(&HashSet::from([1])));
         assert_eq!(connectivity_graph.get(&1), Some(&HashSet::from([0])));
+
+        // p2 is not connected to any other polygon.
         assert_eq!(connectivity_graph.get(&2), None);
 
     }
