@@ -72,20 +72,7 @@ impl<T, Ctr> SweepEvent<T, Ctr, ()>
         other_event: Weak<SweepEvent<T, Ctr>>,
         is_upper_boundary: bool,
     ) -> Rc<SweepEvent<T, Ctr>> {
-        Rc::new(SweepEvent {
-            mutable: RefCell::new(MutablePart {
-                other_event,
-                prev: Weak::new(),
-                counter: Default::default(),
-                pos: 0,
-            }),
-            p: point,
-            original_edge: Edge::new(point, other_point),
-            is_left_event,
-            is_upper_boundary,
-            edge_id,
-            property: Some(())
-        })
+        Self::new_rc_with_property(edge_id, point, other_point, is_left_event, other_event, is_upper_boundary, Some(()))
     }
 }
 
