@@ -12,7 +12,6 @@ use iron_shapes::edge::{Edge, Side};
 use iron_shapes::CoordinateType;
 
 use std::cmp::Ordering;
-use crate::PolygonSemantics;
 
 /// Distinguish between the left and right operand of the boolean operation.
 /// This matters for the boolean intersection and difference only.

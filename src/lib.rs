@@ -47,11 +47,12 @@ extern crate iron_shapes;
 
 mod connect_edges;
 mod sweep_line;
+mod booleanop;
 
 use num_rational::{Rational32, Rational64};
 
 // API exports.
-pub use sweep_line::intersection::boolean_op;
+pub use booleanop::boolean_op;
 pub use sweep_line::intersection::{edge_intersection_float, edge_intersection_integer, edge_intersection_rational};
 
 use iron_shapes::prelude::{CoordinateType, Polygon, MultiPolygon};

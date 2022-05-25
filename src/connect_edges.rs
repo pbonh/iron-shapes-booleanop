@@ -8,7 +8,7 @@
 //! Connect the resulting edges of the sweep line algorithm into polygons.
 
 use iron_shapes::CoordinateType;
-use super::sweep_line::sweep_event::{SweepEvent, PolygonType};
+use super::sweep_line::sweep_event::SweepEvent;
 use super::Operation;
 use std::rc::Rc;
 use std::fmt::Debug;
