@@ -47,8 +47,6 @@ pub struct SweepEvent<T, Ctr, Property = ()> {
     pub original_edge: Edge<T>,
     /// Is p the left endpoint of the edge (p, other.p)?
     is_left_event: bool,
-    /// Type of polygon: either SUBJECT or CLIPPING.
-    pub polygon_type: PolygonType,
     /// Is this edge an upper boundary of the input polygon?
     pub is_upper_boundary: bool,
     /// Unique ID of the edge. Used to break ties and guarantee ordering for overlapping edges.
@@ -71,7 +69,6 @@ impl<T, Ctr> SweepEvent<T, Ctr, ()>
         other_point: Point<T>,
         is_left_event: bool,
         other_event: Weak<SweepEvent<T, Ctr>>,
-        polygon_type: PolygonType,
         is_upper_boundary: bool,
     ) -> Rc<SweepEvent<T, Ctr>> {
         Rc::new(SweepEvent {
@@ -84,7 +81,6 @@ impl<T, Ctr> SweepEvent<T, Ctr, ()>
             p: point,
             original_edge: Edge::new(point, other_point),
             is_left_event,
-            polygon_type,
             is_upper_boundary,
             edge_id,
             property: Some(())
@@ -102,7 +98,6 @@ impl<T, Ctr, Property> SweepEvent<T, Ctr, Property>
         other_point: Point<T>,
         is_left_event: bool,
         other_event: Weak<SweepEvent<T, Ctr, Property>>,
-        polygon_type: PolygonType,
         is_upper_boundary: bool,
         property: Option<Property>,
     ) -> Rc<SweepEvent<T, Ctr, Property>> {
@@ -117,7 +112,6 @@ impl<T, Ctr, Property> SweepEvent<T, Ctr, Property>
             p: point,
             original_edge: Edge::new(point, other_point),
             is_left_event,
-            polygon_type,
             is_upper_boundary,
             edge_id,
             property
@@ -269,11 +263,9 @@ impl<'a, T, Ctr, P> Ord for SweepEvent<T, Ctr, P>
                             Side::Center => {
                                 debug_assert!(edge1.is_collinear(&edge2));
 
-                                // Subject before clipping edges,
-                                // then lower boundaries before upper boundaries
+                                // Lower boundaries before upper boundaries
                                 // then break ties by the edge_id.
-                                self.polygon_type.cmp(&other.polygon_type)
-                                    .then_with(|| self.is_upper_boundary.cmp(&other.is_upper_boundary))
+                                self.is_upper_boundary.cmp(&other.is_upper_boundary)
                                     .then_with(|| self.edge_id.cmp(&other.edge_id))
                             }
                         }
@@ -301,7 +293,6 @@ mod test {
             (0, 0).into(),
             true, // left
             Weak::new(),
-            PolygonType::Subject,
             false,
         );
         let right = SweepEvent::new_rc(
@@ -310,7 +301,6 @@ mod test {
             (0, 0).into(),
             false, // right
             Weak::new(),
-            PolygonType::Subject,
             false,
         );
 
@@ -325,7 +315,6 @@ mod test {
             (0, 0).into(),
             true, // left
             Weak::new(),
-            PolygonType::Subject,
             false,
         );
         let right = SweepEvent::new_rc(
@@ -334,7 +323,6 @@ mod test {
             (0, 0).into(),
             false, // right
             Weak::new(),
-            PolygonType::Subject,
             false,
         );
 
@@ -356,7 +344,6 @@ mod test {
             (0, 0).into(),
             true, // left
             Weak::new(),
-            PolygonType::Subject,
             false,
         );
         let upper = SweepEvent::new_rc(
@@ -365,7 +352,6 @@ mod test {
             (0, 1).into(),
             false, // right
             Weak::new(),
-            PolygonType::Subject,
             false,
         );
 

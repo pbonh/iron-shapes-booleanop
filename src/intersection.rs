@@ -62,7 +62,6 @@ fn fill_queue<'a, T, S, C, Ctr>(
                     edge.end,
                     event_a_is_left,
                     Weak::new(),
-                    polygon_type,
                     is_upper_boundary,
                     Some(polygon_type),
                 );
@@ -72,7 +71,6 @@ fn fill_queue<'a, T, S, C, Ctr>(
                     edge.start,
                     !event_a_is_left,
                     Rc::downgrade(&event_a),
-                    polygon_type,
                     is_upper_boundary,
                     Some(polygon_type),
                 );
@@ -117,6 +115,10 @@ fn update_counter<T>(event: &Rc<SweepEvent<T, DualCounter, PolygonType>>,
                      maybe_prev: Option<&Rc<SweepEvent<T, DualCounter, PolygonType>>>)
     where T: CoordinateType,
 {
+
+    debug_assert!(event.is_left_event());
+    let polygon_type = event.property.unwrap(); // Property must be set for all left events.
+
     // Update counter.
     {
         let mut updated_ctr = maybe_prev.map(|prev| {
@@ -125,7 +127,7 @@ fn update_counter<T>(event: &Rc<SweepEvent<T, DualCounter, PolygonType>>,
         })
             .unwrap_or(Default::default());
 
-        match event.polygon_type {
+        match polygon_type {
             PolygonType::Subject => updated_ctr.subject_count += event.edge_weight(),
             PolygonType::Clipping => updated_ctr.clipping_count += event.edge_weight(),
         }
@@ -139,12 +141,14 @@ fn update_counter<T>(event: &Rc<SweepEvent<T, DualCounter, PolygonType>>,
 
 // Check if the event is contained in the result.
 fn contributes_to_result_binary_booleanop<T: CoordinateType>(event: &SweepEvent<T, DualCounter, PolygonType>, polygon_semantics: PolygonSemantics, operation: Operation) -> bool {
+
     debug_assert!(event.is_left_event());
+    let polygon_type = event.property.unwrap(); // Property must be set for all left events.
 
     let (own_counter, other_counter) = {
         let counter = event.with_counter(|ctr| *ctr);
 
-        match event.polygon_type {
+        match polygon_type {
             PolygonType::Subject => (counter.subject_count, counter.clipping_count),
             PolygonType::Clipping => (counter.clipping_count, counter.subject_count),
         }
@@ -178,7 +182,7 @@ fn contributes_to_result_binary_booleanop<T: CoordinateType>(event: &SweepEvent<
         match operation {
             Operation::Intersection => !is_outside_other,
             Operation::Union => is_outside_other,
-            Operation::Difference => match event.polygon_type {
+            Operation::Difference => match polygon_type {
                 PolygonType::Subject => is_outside_other,
                 PolygonType::Clipping => !is_outside_other
             }

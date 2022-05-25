@@ -92,11 +92,9 @@ pub fn compare_events_by_segments<T, Ctr, P>(le1: &Rc<SweepEvent<T, Ctr, P>>,
         // Segments are collinear, thus they intersect the scan line in the same point.
 
         // Break the tie as follows:
-        // Subject before clipping edges,
-        // then lower boundaries before upper boundaries
+        // Lower boundaries before upper boundaries
         // then break ties by the edge_id.
         edge1.start.partial_cmp(&edge2.start).unwrap()
-            .then_with(|| le1.polygon_type.cmp(&le2.polygon_type))
             .then_with(|| le1.is_upper_boundary.cmp(&le2.is_upper_boundary))
             .then_with(|| le1.get_edge_id().cmp(&le2.get_edge_id()))
     } else {
@@ -150,24 +148,24 @@ mod test {
         left: (f64, f64),
         right: (f64, f64),
         polygon_type: PolygonType,
-    ) -> (Rc<SweepEvent<f64, ()>>, Rc<SweepEvent<f64, ()>>) {
-        let other = SweepEvent::new_rc(
+    ) -> (Rc<SweepEvent<f64, (), PolygonType>>, Rc<SweepEvent<f64, (), PolygonType>>) {
+        let other = SweepEvent::new_rc_with_property(
             event_id,
             right.into(),
             left.into(),
             false,
             Weak::new(),
-            polygon_type,
             false,
+            Some(polygon_type)
         );
-        let event = SweepEvent::new_rc(
+        let event = SweepEvent::new_rc_with_property(
             event_id,
             left.into(),
             right.into(),
             true,
             Rc::downgrade(&other),
-            polygon_type,
             false,
+            Some(polygon_type)
         );
         other.set_other_event(&event);
 
@@ -176,7 +174,7 @@ mod test {
 
     fn simple_event_pair(
         left: (f64, f64),
-        right: (f64, f64)) -> (Rc<SweepEvent<f64, ()>>, Rc<SweepEvent<f64, ()>>) {
+        right: (f64, f64)) -> (Rc<SweepEvent<f64, (), PolygonType>>, Rc<SweepEvent<f64, (), PolygonType>>) {
         make_event_pair(0, left, right, PolygonType::Clipping)
     }
 

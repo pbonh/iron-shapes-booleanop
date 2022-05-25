@@ -33,7 +33,6 @@ struct Event<T: CoordinateType> {
     is_upper_boundary: bool,
     /// Tells if this is the left or right event of the segment.
     is_left_event: bool,
-    polygon_type: PolygonType,
     contour_id: usize,
 }
 
@@ -216,7 +215,6 @@ fn order_events<T, Ctr, P>(events: &mut Vec<Rc<SweepEvent<T, Ctr, P>>>) -> Vec<E
                 is_left_event: event.is_left_event(),
                 is_hole: false,
                 is_upper_boundary: false, // TODO: Is this used?
-                polygon_type: event.polygon_type,
                 contour_id: usize::MAX,
             }
         }
