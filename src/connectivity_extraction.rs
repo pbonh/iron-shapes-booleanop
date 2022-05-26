@@ -15,12 +15,15 @@ use std::hash::Hash;
 use crate::sweep_line::sweep_event::SweepEvent;
 use crate::sweep_line::intersection::subdivide_segments;
 
-/// Extract a connectivity graph of a set of polygons.
+/// Extract a connectivity of a set of polygons.
+/// Connectivity is encoded as an iterator over multi-graph edges.
+/// Each consists of the IDs of the two touching polygons and a location where the both polygons touch.
+/// Edges can appear many times.
 pub fn extract_connectivity<'a, I, T, Polygons, ID>(
     edge_intersection: I,
     polygons: Polygons,
     polygon_semantics: PolygonSemantics,
-) -> HashMap<ID, HashSet<ID>>
+) -> impl Iterator<Item=(ID, ID, Point<T>)>
     where I: Fn(&Edge<T>, &Edge<T>) -> EdgeIntersection<T, T, Edge<T>>,
           T: CoordinateType + Debug + 'a,
           Polygons: IntoIterator<Item=(ID, &'a Polygon<T>)>,
@@ -43,27 +46,29 @@ pub fn extract_connectivity<'a, I, T, Polygons, ID>(
 
     // Extract connectivity graph.
     {
-        let mut graph: HashMap<ID, HashSet<ID>> = Default::default();
 
         // Take left events only.
         let left_events = sorted_events.into_iter()
             .filter(|e| e.is_left_event());
 
+
         // Check if an edge count signals the inside or the outside of a polygon.
-        let is_inside = |count: i32| -> bool {
+        let is_inside = move |count: i32| -> bool {
             match polygon_semantics {
                 PolygonSemantics::Union => count != 0,
                 PolygonSemantics::XOR => count % 2 != 0
             }
         };
 
-
         // Create iterator of graph edges.
-        // Edges may appear multiple times.
+        // Edges may appear multiple times. Each edge comes with a point which indicates the location of the connectivity.
         let multi_graph_edges = left_events
-            .flat_map(|current_event| {
+            .flat_map(move |current_event| {
+                // Get connectivity of this event.
+
                 debug_assert!(current_event.is_left_event());
                 let shape_id = current_event.property.as_ref().unwrap().clone(); // Left event must have the property.
+                let point = current_event.p; // Location of connectivity.
 
                 // Take counter from event to own it.
                 // This destroys the structure of the sweep events.
@@ -75,26 +80,44 @@ pub fn extract_connectivity<'a, I, T, Polygons, ID>(
                 let shape_id_clone = shape_id.clone();
                 let connected_ids = counter.counters.into_iter()
                     .filter(move |(id, _count)| id != &shape_id_clone) // Look only at other polygons.
-                    .filter(|(_id, count)| is_inside(*count))
+                    .filter(move |(_id, count)| is_inside(*count))
                     .map(|(id, _)| id);
 
                 connected_ids
-                    .map(move |id| (shape_id.clone(), id))
+                    .map(move |id| (shape_id.clone(), id, point))
             });
 
-        // Insert graph edges.
-        for (id_a, id_b) in multi_graph_edges {
-            graph.entry(id_a.clone())
-                .or_insert(Default::default())
-                .insert(id_b.clone());
-            // Insert reverse edge.
-            graph.entry(id_b)
-                .or_insert(Default::default())
-                .insert(id_a);
-        }
-
-        graph
+        multi_graph_edges
     }
+}
+
+
+/// Extract a connectivity graph of a set of polygons.
+pub fn extract_connectivity_graph<'a, I, T, Polygons, ID>(
+    edge_intersection: I,
+    polygons: Polygons,
+    polygon_semantics: PolygonSemantics,
+) -> HashMap<ID, HashSet<ID>>
+    where I: Fn(&Edge<T>, &Edge<T>) -> EdgeIntersection<T, T, Edge<T>>,
+          T: CoordinateType + Debug + 'a,
+          Polygons: IntoIterator<Item=(ID, &'a Polygon<T>)>,
+          ID: Clone + Hash + Eq
+{
+    let multi_graph_edges = extract_connectivity(edge_intersection, polygons, polygon_semantics);
+
+    let mut graph: HashMap<ID, HashSet<ID>> = Default::default();
+    // Insert graph edges.
+    for (id_a, id_b, _point) in multi_graph_edges {
+        graph.entry(id_a.clone())
+            .or_insert(Default::default())
+            .insert(id_b.clone());
+        // Insert reverse edge.
+        graph.entry(id_b)
+            .or_insert(Default::default())
+            .insert(id_a);
+    }
+
+    graph
 }
 
 #[derive(Clone)]

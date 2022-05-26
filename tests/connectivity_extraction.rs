@@ -25,7 +25,7 @@ mod booleanop {
 
         let polygons = vec![p0, p1, p2];
 
-        let connectivity_graph = extract_connectivity(
+        let connectivity_graph = extract_connectivity_graph(
             edge_intersection_float,
             polygons.iter().enumerate(),
             PolygonSemantics::Union,
@@ -48,7 +48,7 @@ mod booleanop {
 
         let polygons = vec![p0, p1];
 
-        let connectivity_graph = extract_connectivity(
+        let connectivity_graph = extract_connectivity_graph(
             edge_intersection_float,
             polygons.iter().enumerate(),
             PolygonSemantics::Union,
@@ -67,7 +67,7 @@ mod booleanop {
 
         let polygons = vec![p0, p1];
 
-        let connectivity_graph = extract_connectivity(
+        let connectivity_graph = extract_connectivity_graph(
             edge_intersection_float,
             polygons.iter().enumerate(),
             PolygonSemantics::Union,
