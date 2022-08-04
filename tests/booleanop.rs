@@ -54,6 +54,26 @@ mod booleanop {
     }
 
     #[test]
+    fn test_union_of_rectangle_array() {
+        // Polygon union in integer coordinates.
+
+        let rect = Polygon::from(vec![(0, 0), (2, 0), (2, 2), (0, 2)]);
+        let p1 = rect.translate((0, 0).into());
+        let p2 = rect.translate((2, 0).into());
+        let p3 = rect.translate((4, 0).into());
+
+        let expected_union = Polygon::from(vec![(0, 0), (2, 0), (4, 0), (6, 0), (6, 2), (4, 2), (2, 2), (0, 2)]);
+
+        let i = boolean_op(
+            edge_intersection_integer, &[p1, p2, p3], &[],
+            Operation::Union,
+            PolygonSemantics::Union);
+
+        assert_eq!(i.len(), 1);
+        assert_eq!(i.polygons[0], expected_union);
+    }
+
+    #[test]
     fn test_degenerate_polygons() {
         // Polygons with zero area.
 
