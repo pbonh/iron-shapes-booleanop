@@ -137,13 +137,17 @@ pub fn boolean_op<'a, I, T, S, C>(edge_intersection: I,
           C: IntoIterator<Item=&'a Polygon<T>>,
 {
 
+    let subject_edges = subject.into_iter()
+        .flat_map(|p| p.all_edges_iter())
+        .map(|edge| (edge, PolygonType::Subject));
+
+    let clipping_edges = clipping.into_iter()
+        .flat_map(|p| p.all_edges_iter())
+        .map(|edge| (edge, PolygonType::Clipping));
+
     // Prepare the event queue.
     let mut event_queue : BinaryHeap<Rc<SweepEvent<_, DualCounter, PolygonType>>> = crate::init_events::fill_queue(
-      subject.into_iter()
-          .map(|p| (p, PolygonType::Subject))
-          .chain(clipping.into_iter()
-              .map(|p| (p, PolygonType::Clipping))
-          )
+      subject_edges.chain(clipping_edges)
     );
 
     // Compute the edge intersections, the result is a set of sorted non-intersecting edges stored

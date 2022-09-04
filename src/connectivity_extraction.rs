@@ -33,7 +33,7 @@ pub fn extract_connectivity<'a, I, T, Polygons, ID>(
     // Prepare the event queue.
     let mut event_queue: BinaryHeap<Rc<SweepEvent<_, Counter<ID>, ID>>> = crate::init_events::fill_queue(
         polygons.into_iter()
-            .map(|(id, polygon)| (polygon, id))
+            .flat_map(|(id, p)| p.all_edges_iter().map(move |edge| (edge, id.clone())))
     );
 
     // Compute the edge intersections, the result is a set of sorted non-intersecting edges stored
