@@ -112,6 +112,7 @@ fn contributes_to_result_binary_booleanop<T: CoordinateType>(event: &SweepEvent<
 
 /// Perform boolean operation.
 ///
+///
 /// # Example
 /// ```
 /// use iron_shapes_booleanop::*;
@@ -126,6 +127,7 @@ fn contributes_to_result_binary_booleanop<T: CoordinateType>(event: &SweepEvent<
 /// assert_eq!(i.len(), 1);
 /// assert_eq!(i.polygons[0], expected_union);
 /// ```
+#[deprecated(note="use edges_boolean_op() instead")]
 pub fn boolean_op<'a, I, T, S, C>(edge_intersection: I,
                                   subject: S,
                                   clipping: C,
@@ -136,13 +138,53 @@ pub fn boolean_op<'a, I, T, S, C>(edge_intersection: I,
           S: IntoIterator<Item=&'a Polygon<T>>,
           C: IntoIterator<Item=&'a Polygon<T>>,
 {
-
     let subject_edges = subject.into_iter()
-        .flat_map(|p| p.all_edges_iter())
-        .map(|edge| (edge, PolygonType::Subject));
+        .flat_map(|p| p.all_edges_iter());
 
     let clipping_edges = clipping.into_iter()
-        .flat_map(|p| p.all_edges_iter())
+        .flat_map(|p| p.all_edges_iter());
+
+    edges_boolean_op(
+        edge_intersection,
+        subject_edges,
+        clipping_edges,
+        operation,
+        polygon_semantics
+    )
+}
+
+/// Perform boolean operation on a set of edges derived from polygons.
+/// The edges must form closed contours. Otherwise the output is undefined.
+///
+/// # Example
+/// ```
+/// use iron_shapes_booleanop::*;
+/// use iron_shapes::prelude::*;
+/// let p1 = Polygon::from(vec![(0., 0.), (2., 0.), (2., 2.), (0., 2.)]);
+/// let p2 = p1.translate((1., 1.).into());
+/// let expected_union = Polygon::from(vec![(0., 0.), (2., 0.), (2., 1.), (3., 1.),
+///                                                 (3., 3.), (1., 3.), (1., 2.), (0., 2.)]);
+///
+/// let i = edges_boolean_op(edge_intersection_float, p1.all_edges_iter(), p2.all_edges_iter(), Operation::Union, PolygonSemantics::XOR);
+///
+/// assert_eq!(i.len(), 1);
+/// assert_eq!(i.polygons[0], expected_union);
+/// ```
+pub fn edges_boolean_op<'a, I, T, S, C>(edge_intersection: I,
+                                  subject: S,
+                                  clipping: C,
+                                  operation: Operation,
+                                  polygon_semantics: PolygonSemantics) -> MultiPolygon<T>
+    where I: Fn(&Edge<T>, &Edge<T>) -> EdgeIntersection<T, T, Edge<T>>,
+          T: CoordinateType + Debug + 'a,
+          S: Iterator<Item=Edge<T>>,
+          C: Iterator<Item=Edge<T>>,
+{
+
+    let subject_edges = subject
+        .map(|edge| (edge, PolygonType::Subject));
+
+    let clipping_edges = clipping
         .map(|edge| (edge, PolygonType::Clipping));
 
     // Prepare the event queue.

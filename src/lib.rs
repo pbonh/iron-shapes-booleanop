@@ -54,10 +54,28 @@ mod init_events;
 use num_rational::{Rational32, Rational64};
 
 // API exports.
-pub use booleanop::boolean_op;
+pub use booleanop::{boolean_op, edges_boolean_op};
+use iron_shapes::point::Point;
 pub use sweep_line::intersection::{edge_intersection_float, edge_intersection_integer, edge_intersection_rational};
 
 use iron_shapes::prelude::{CoordinateType, Polygon, MultiPolygon};
+
+// /// Abstraction of a line segment or 'edge'.
+// pub trait Segment {
+//     /// Numeric type used for coordinates.
+//     type Coord: CoordinateType;
+//
+//     /// Get the starting point of the segment.
+//     fn start(&self) -> Point<Self::Coord>;
+//
+//     /// Get the end point of the segment.
+//     fn end(&self) -> Point<Self::Coord>;
+//
+//     /// If start and end point are equal.
+//     fn is_degenerate(&self) -> bool {
+//         self.start() == self.end()
+//     }
+// }
 
 /// Type of boolean operation.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -137,9 +155,9 @@ macro_rules! impl_booleanop_multipolygon {
      impl BooleanOp<$coord> for MultiPolygon<$coord> {
         fn boolean_op(&self, operation: Operation, other: &Self, polygon_semantics: PolygonSemantics)
          -> MultiPolygon<$coord> {
-            let subject = self.polygons.iter();
-            let clipping = other.polygons.iter();
-            boolean_op(
+            let subject = self.all_edges_iter();
+            let clipping = other.all_edges_iter();
+            edges_boolean_op(
                 &$edge_intersection,
                 subject,
                 clipping,
@@ -166,9 +184,9 @@ macro_rules! impl_booleanop_polygon {
      impl BooleanOp<$coord> for Polygon<$coord> {
         fn boolean_op(&self, operation: Operation, other: &Self, polygon_semantics: PolygonSemantics)
         -> MultiPolygon<$coord> {
-            let subject = std::iter::once(self);
-            let clipping = std::iter::once(other);
-            boolean_op(
+            let subject = self.all_edges_iter();
+            let clipping = other.all_edges_iter();
+            edges_boolean_op(
                 &$edge_intersection,
                 subject,
                 clipping,
