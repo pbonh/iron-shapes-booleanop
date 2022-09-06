@@ -55,7 +55,6 @@ use num_rational::{Rational32, Rational64};
 
 // API exports.
 pub use booleanop::{boolean_op, edges_boolean_op};
-use iron_shapes::point::Point;
 pub use sweep_line::intersection::{edge_intersection_float, edge_intersection_integer, edge_intersection_rational};
 
 use iron_shapes::prelude::{CoordinateType, Polygon, MultiPolygon};
