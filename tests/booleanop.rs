@@ -9,13 +9,13 @@
 mod booleanop {
     extern crate rand;
 
-    use iron_shapes_booleanop::*;
-    use iron_shapes::prelude::*;
-    use iron_shapes::traits::{Translate, Scale};
-    use num_rational::Rational64;
-    use self::rand::distributions::{Uniform, Distribution};
+    use self::rand::distributions::{Distribution, Uniform};
     use self::rand::rngs::StdRng;
     use self::rand::SeedableRng;
+    use iron_shapes::prelude::*;
+    use iron_shapes::traits::{Scale, Translate};
+    use iron_shapes_booleanop::*;
+    use num_rational::Rational64;
 
     #[test]
     fn test_boolean_op_simple() {
@@ -26,8 +26,16 @@ mod booleanop {
         // let p1 = Polygon::from(vec![(1., 0.), (2., 1.), (1., 2.), (0., 1.)]);
         // let p2 = p1.translate((1., 0.).into());
 
-        let expected_union = Polygon::from(vec![(0., 0.), (2., 0.), (2., 1.), (3., 1.),
-                                                (3., 3.), (1., 3.), (1., 2.), (0., 2.)]);
+        let expected_union = Polygon::from(vec![
+            (0., 0.),
+            (2., 0.),
+            (2., 1.),
+            (3., 1.),
+            (3., 3.),
+            (1., 3.),
+            (1., 2.),
+            (0., 2.),
+        ]);
 
         let i = p1.union(&p2);
 
@@ -41,13 +49,24 @@ mod booleanop {
         let p1 = Polygon::from(vec![(0, 0), (2, 0), (2, 2), (0, 2)]);
         let p2 = p1.translate((1, 1).into());
 
-        let expected_union = Polygon::from(vec![(0, 0), (2, 0), (2, 1), (3, 1),
-                                                (3, 3), (1, 3), (1, 2), (0, 2)]);
+        let expected_union = Polygon::from(vec![
+            (0, 0),
+            (2, 0),
+            (2, 1),
+            (3, 1),
+            (3, 3),
+            (1, 3),
+            (1, 2),
+            (0, 2),
+        ]);
 
         let i = boolean_op(
-            edge_intersection_integer, &[p1], &[p2],
+            edge_intersection_integer,
+            &[p1],
+            &[p2],
             Operation::Union,
-            PolygonSemantics::XOR);
+            PolygonSemantics::XOR,
+        );
 
         assert_eq!(i.len(), 1);
         assert_eq!(i.polygons[0], expected_union);
@@ -62,12 +81,24 @@ mod booleanop {
         let p2 = rect.translate((2, 0).into());
         let p3 = rect.translate((4, 0).into());
 
-        let expected_union = Polygon::from(vec![(0, 0), (2, 0), (4, 0), (6, 0), (6, 2), (4, 2), (2, 2), (0, 2)]);
+        let expected_union = Polygon::from(vec![
+            (0, 0),
+            (2, 0),
+            (4, 0),
+            (6, 0),
+            (6, 2),
+            (4, 2),
+            (2, 2),
+            (0, 2),
+        ]);
 
         let i = boolean_op(
-            edge_intersection_integer, &[p1, p2, p3], &[],
+            edge_intersection_integer,
+            &[p1, p2, p3],
+            &[],
             Operation::Union,
-            PolygonSemantics::Union);
+            PolygonSemantics::Union,
+        );
 
         assert_eq!(i.len(), 1);
         assert_eq!(i.polygons[0], expected_union);
@@ -91,68 +122,91 @@ mod booleanop {
         let p1 = Polygon::from(vec![(0., 0.), (2., 0.), (2., 2.)]);
 
         let i = boolean_op(
-            edge_intersection_float, vec![&p1], vec![&p1], Operation::Union,
-            PolygonSemantics::XOR);
+            edge_intersection_float,
+            vec![&p1],
+            vec![&p1],
+            Operation::Union,
+            PolygonSemantics::XOR,
+        );
 
         assert_eq!(i.len(), 1);
         assert_eq!(&i.polygons[0], &p1);
     }
 
-
     #[test]
     fn test_boolean_op_duplicate_union_semantics() {
-
         // Use the same polygon multiple times as a subject or clipping polygon.
         // Union semantics should reduce multiple overlapping polygons into one polygon.
 
         let p1 = Polygon::from(vec![(0., 0.), (2., 0.), (2., 2.)]);
 
         let i = boolean_op(
-            edge_intersection_float, vec![], vec![&p1, &p1],
+            edge_intersection_float,
+            vec![],
+            vec![&p1, &p1],
             Operation::Union,
-            PolygonSemantics::Union);
+            PolygonSemantics::Union,
+        );
         assert_eq!(i.len(), 1);
         assert_eq!(&i.polygons[0], &p1);
 
         let i = boolean_op(
-            edge_intersection_float, vec![&p1, &p1], vec![],
+            edge_intersection_float,
+            vec![&p1, &p1],
+            vec![],
             Operation::Union,
-            PolygonSemantics::Union);
+            PolygonSemantics::Union,
+        );
         assert_eq!(i.len(), 1);
         assert_eq!(&i.polygons[0], &p1);
 
         let i = boolean_op(
-            edge_intersection_float, vec![&p1], vec![&p1],
+            edge_intersection_float,
+            vec![&p1],
+            vec![&p1],
             Operation::Union,
-            PolygonSemantics::Union);
+            PolygonSemantics::Union,
+        );
         assert_eq!(i.len(), 1);
         assert_eq!(&i.polygons[0], &p1);
 
         let i = boolean_op(
-            edge_intersection_float, vec![&p1, &p1], vec![&p1],
+            edge_intersection_float,
+            vec![&p1, &p1],
+            vec![&p1],
             Operation::Union,
-            PolygonSemantics::Union);
+            PolygonSemantics::Union,
+        );
         assert_eq!(i.len(), 1);
         assert_eq!(&i.polygons[0], &p1);
 
         let i = boolean_op(
-            edge_intersection_float, vec![&p1], vec![&p1, &p1],
+            edge_intersection_float,
+            vec![&p1],
+            vec![&p1, &p1],
             Operation::Union,
-            PolygonSemantics::Union);
+            PolygonSemantics::Union,
+        );
         assert_eq!(i.len(), 1);
         assert_eq!(&i.polygons[0], &p1);
 
         let i = boolean_op(
-            edge_intersection_float, vec![&p1, &p1], vec![&p1, &p1],
+            edge_intersection_float,
+            vec![&p1, &p1],
+            vec![&p1, &p1],
             Operation::Union,
-            PolygonSemantics::Union);
+            PolygonSemantics::Union,
+        );
         assert_eq!(i.len(), 1);
         assert_eq!(&i.polygons[0], &p1);
 
         let i = boolean_op(
-            edge_intersection_float, vec![&p1, &p1, &p1, &p1, &p1], vec![&p1, &p1, &p1],
+            edge_intersection_float,
+            vec![&p1, &p1, &p1, &p1, &p1],
+            vec![&p1, &p1, &p1],
             Operation::Union,
-            PolygonSemantics::Union);
+            PolygonSemantics::Union,
+        );
         assert_eq!(i.len(), 1);
         assert_eq!(&i.polygons[0], &p1);
     }
@@ -163,56 +217,75 @@ mod booleanop {
         let p1 = Polygon::from(vec![(0., 0.), (2., 0.), (2., 2.)]);
 
         let i = boolean_op(
-            edge_intersection_float, vec![&p1], vec![],
+            edge_intersection_float,
+            vec![&p1],
+            vec![],
             Operation::Xor,
-            PolygonSemantics::XOR);
+            PolygonSemantics::XOR,
+        );
         assert_eq!(i.len(), 1);
         assert_eq!(&i.polygons[0], &p1);
 
         let i = boolean_op(
-            edge_intersection_float, vec![], vec![&p1],
+            edge_intersection_float,
+            vec![],
+            vec![&p1],
             Operation::Xor,
-            PolygonSemantics::XOR);
+            PolygonSemantics::XOR,
+        );
         assert_eq!(i.len(), 1);
         assert_eq!(&i.polygons[0], &p1);
 
         let i = boolean_op(
-            edge_intersection_float, vec![&p1], vec![&p1],
+            edge_intersection_float,
+            vec![&p1],
+            vec![&p1],
             Operation::Xor,
-            PolygonSemantics::XOR);
+            PolygonSemantics::XOR,
+        );
         assert_eq!(i.len(), 0);
 
         let i = boolean_op(
-            edge_intersection_float, vec![&p1, &p1], vec![],
+            edge_intersection_float,
+            vec![&p1, &p1],
+            vec![],
             Operation::Xor,
-            PolygonSemantics::XOR);
+            PolygonSemantics::XOR,
+        );
         assert_eq!(i.len(), 0);
 
         let i = boolean_op(
-            edge_intersection_float, vec![], vec![&p1, &p1],
+            edge_intersection_float,
+            vec![],
+            vec![&p1, &p1],
             Operation::Xor,
-            PolygonSemantics::XOR);
+            PolygonSemantics::XOR,
+        );
         assert_eq!(i.len(), 0);
 
         let i = boolean_op(
-            edge_intersection_float, vec![&p1, &p1], vec![&p1],
+            edge_intersection_float,
+            vec![&p1, &p1],
+            vec![&p1],
             Operation::Xor,
-            PolygonSemantics::XOR);
+            PolygonSemantics::XOR,
+        );
         assert_eq!(i.len(), 1);
         assert_eq!(&i.polygons[0], &p1);
 
         let i = boolean_op(
-            edge_intersection_float, vec![&p1], vec![&p1, &p1],
+            edge_intersection_float,
+            vec![&p1],
+            vec![&p1, &p1],
             Operation::Xor,
-            PolygonSemantics::XOR);
+            PolygonSemantics::XOR,
+        );
         assert_eq!(i.len(), 1);
         assert_eq!(&i.polygons[0], &p1);
     }
 
-
     #[test]
     fn test_holes() {
-
         // Test the hole attribution (assignment of holes to the correct polygon).
 
         let little_square = Polygon::from(vec![(0., 0.), (1., 0.), (1., 1.), (0., 1.)]);
@@ -237,7 +310,6 @@ mod booleanop {
         assert!(!i.contains_point((100., 100.).into()));
     }
 
-
     #[test]
     fn test_separate_polygons_or_hole() {
         let little_square = Polygon::from(vec![(0., 0.), (1., 0.), (1., 1.), (0., 1.)]);
@@ -255,13 +327,13 @@ mod booleanop {
         let probe_points = [(0., 0.), (0.5, 0.5), (1., 1.), (1.5, 1.5), (2.5, 2.5)];
 
         // Create grid of probe points.
-//        let n = 32;
-//        let scale = 3.0 * n as f64;
-//        let grid = (0..n).into_iter()
-//            .flat_map(|x|
-//                (0..n).into_iter()
-//                    .map(move |y| (x,y))
-//            ).map(|(x,y)| (x as f64 * scale, y as f64 * scale));
+        //        let n = 32;
+        //        let scale = 3.0 * n as f64;
+        //        let grid = (0..n).into_iter()
+        //            .flat_map(|x|
+        //                (0..n).into_iter()
+        //                    .map(move |y| (x,y))
+        //            ).map(|(x,y)| (x as f64 * scale, y as f64 * scale));
 
         for p in &probe_points {
             let p = p.into();
@@ -273,7 +345,6 @@ mod booleanop {
             assert_eq!(result.contains_point(p), expected);
         }
     }
-
 
     #[test]
     fn test_rational_collinear_edge() {
@@ -293,8 +364,12 @@ mod booleanop {
             PolygonSemantics::XOR,
         );
 
-        let expected = Polygon::from(vec![rp(1, 0), rp(5, 0),
-                                          rp(3, 1), (r(3, 2), r(1, 2)).into()]);
+        let expected = Polygon::from(vec![
+            rp(1, 0),
+            rp(5, 0),
+            rp(3, 1),
+            (r(3, 2), r(1, 2)).into(),
+        ]);
 
         assert_eq!(result.polygons[0], expected);
     }
@@ -304,7 +379,7 @@ mod booleanop {
         // The edges on the x-axis are collinear and overlap.
 
         let rp = |a: i64, b: i64| Point::new(Rational64::from(a), Rational64::from(b));
-//        let rp = |a: i64, b: i64| Point::new(a, b);
+        //        let rp = |a: i64, b: i64| Point::new(a, b);
         let r = |a: i64, b: i64| Rational64::new(a, b);
 
         let scale = r(1, 1);
@@ -313,7 +388,7 @@ mod booleanop {
 
         let result = boolean_op(
             edge_intersection_rational,
-//            edge_intersection_integer,
+            //            edge_intersection_integer,
             vec![&a],
             vec![&b],
             Operation::Intersection,
@@ -322,8 +397,8 @@ mod booleanop {
 
         dbg!(&result);
 
-//        let expected = Polygon::from(vec![rp(1, 0), rp(5, 0),
-//                                          rp(3, 1), (r(3,2), r(1,2)).into()]);
+        //        let expected = Polygon::from(vec![rp(1, 0), rp(5, 0),
+        //                                          rp(3, 1), (r(3,2), r(1,2)).into()]);
 
         assert_eq!(result.polygons.len(), 1);
         assert_eq!(result.polygons[0].len(), 4);
@@ -346,8 +421,7 @@ mod booleanop {
             PolygonSemantics::XOR,
         );
 
-        let expected = Polygon::from(vec![p(2, 0), p(10, 0),
-                                          p(6, 2), p(3, 1).into()]);
+        let expected = Polygon::from(vec![p(2, 0), p(10, 0), p(6, 2), p(3, 1).into()]);
 
         assert_eq!(result.polygons.len(), 1);
         assert_eq!(result.polygons[0], expected);
@@ -388,7 +462,6 @@ mod booleanop {
         let b = Rect::new((5, 0), (10, 5)).to_polygon();
 
         let subject = vec![&a, &b];
-
 
         let result = boolean_op(
             edge_intersection_integer,
@@ -443,23 +516,22 @@ mod booleanop {
         let b = Polygon::from(vec![p(4, 4), p(11, 11), p(1, 10)]).translate(t);
 
         let result = boolean_op(
-//            edge_intersection_integer,
-edge_intersection_rational,
-vec![&a],
-vec![&b],
-Operation::Intersection,
-PolygonSemantics::XOR,
+            //            edge_intersection_integer,
+            edge_intersection_rational,
+            vec![&a],
+            vec![&b],
+            Operation::Intersection,
+            PolygonSemantics::XOR,
         );
 
-        let expected = Polygon::from(vec![p(4, 4), p(11, 11),
-                                          p(4, 8), p(3, 6).into()]).translate(t);
+        let expected =
+            Polygon::from(vec![p(4, 4), p(11, 11), p(4, 8), p(3, 6).into()]).translate(t);
 
         assert_eq!(result.polygons[0], expected);
     }
 
     #[test]
     fn test_polygon_with_vertical_zero_width_part() {
-
         let a = Polygon {
             exterior: SimplePolygon {
                 points: vec![
@@ -484,7 +556,7 @@ PolygonSemantics::XOR,
             interiors: vec![],
         };
 
-        let intersection =  boolean_op(
+        let intersection = boolean_op(
             edge_intersection_float,
             vec![&a],
             vec![&b],
@@ -514,9 +586,14 @@ PolygonSemantics::XOR,
         let mut rng = StdRng::from_seed(seed1);
 
         let mut rand_polygon = |n_points: usize| -> Polygon<Rational64> {
-            let points: Vec<_> = (0..n_points).into_iter()
-                .map(|_| (Rational64::new(between.sample(&mut rng), 1),
-                          Rational64::new(between.sample(&mut rng), 1)))
+            let points: Vec<_> = (0..n_points)
+                .into_iter()
+                .map(|_| {
+                    (
+                        Rational64::new(between.sample(&mut rng), 1),
+                        Rational64::new(between.sample(&mut rng), 1),
+                    )
+                })
                 .collect();
 
             Polygon::new(&points)
@@ -526,19 +603,23 @@ PolygonSemantics::XOR,
             let a = rand_polygon(5);
             let b = rand_polygon(4);
 
-            let results: Vec<_> = vec![Operation::Intersection,
-                                       Operation::Union,
-                                       Operation::Difference,
-                                       Operation::Xor]
-                .into_iter()
-                .map(|operation| boolean_op(
+            let results: Vec<_> = vec![
+                Operation::Intersection,
+                Operation::Union,
+                Operation::Difference,
+                Operation::Xor,
+            ]
+            .into_iter()
+            .map(|operation| {
+                boolean_op(
                     edge_intersection_rational,
                     vec![&a],
                     vec![&b],
                     operation,
                     PolygonSemantics::XOR,
-                )).collect();
-
+                )
+            })
+            .collect();
 
             // Create grid of probe points.
             let mut rng = StdRng::from_seed(seed2);
@@ -547,17 +628,26 @@ PolygonSemantics::XOR,
             let between = Uniform::from(0..max_coordinate * denominator);
 
             // Create random probe points.
-            let probe_points = (0..num_probe_points).into_iter()
-                .map(|_| (Rational64::new(between.sample(&mut rng), denominator),
-                          Rational64::new(between.sample(&mut rng), denominator)));
+            let probe_points = (0..num_probe_points).into_iter().map(|_| {
+                (
+                    Rational64::new(between.sample(&mut rng), denominator),
+                    Rational64::new(between.sample(&mut rng), denominator),
+                )
+            });
 
             let mut num_checks = 0usize;
             for p in probe_points {
                 let p = p.into();
 
-                let on_border_1 = a.exterior.edges().iter()
+                let on_border_1 = a
+                    .exterior
+                    .edges()
+                    .iter()
                     .any(|e| e.contains_point(p).inclusive_bounds());
-                let on_border_2 = b.exterior.edges().iter()
+                let on_border_2 = b
+                    .exterior
+                    .edges()
+                    .iter()
                     .any(|e| e.contains_point(p).inclusive_bounds());
 
                 if on_border_1 || on_border_2 {
@@ -569,19 +659,13 @@ PolygonSemantics::XOR,
                 let in1 = a.contains_point(p);
                 let in2 = b.contains_point(p);
 
-                let expected = [
-                    in1 & in2,
-                    in1 | in2,
-                    in1 & !in2,
-                    in1 ^ in2,
-                ];
+                let expected = [in1 & in2, in1 | in2, in1 & !in2, in1 ^ in2];
 
-                let result_contains_p: Vec<_> = results.iter().map(|r|
-                    r.contains_point(p)
-                )
-                    .collect();
+                let result_contains_p: Vec<_> =
+                    results.iter().map(|r| r.contains_point(p)).collect();
 
-                let success = result_contains_p.iter()
+                let success = result_contains_p
+                    .iter()
                     .zip(expected.iter())
                     .all(|(actual, expected)| actual == expected);
 
@@ -602,108 +686,106 @@ PolygonSemantics::XOR,
         }
     }
 
-
     // TOOD
-   // #[test]
-   // fn test_almost_degenerate() {
-   //     let p1 = Polygon::from(vec![(0., 0.), (1., 1.), (1., 1.0001)]);
-   //     let p2 = Polygon::from(vec![(1., 0.), (0., 1.), (0., 1.0001)]);
-   //
-   //     let i = boolean_op(
-   //         edge_intersection_float,
-   //         vec![&p1],
-   //         vec![&p2],
-   //         Operation::Intersection,
-   //         PolygonSemantics::XOR
-   //     );
-   //     println!("{:?}", i);
-   //     assert_eq!(i.len(), 1);
-   //     assert_eq!(i.polygons[0].len(), 4);
-   // }
+    // #[test]
+    // fn test_almost_degenerate() {
+    //     let p1 = Polygon::from(vec![(0., 0.), (1., 1.), (1., 1.0001)]);
+    //     let p2 = Polygon::from(vec![(1., 0.), (0., 1.), (0., 1.0001)]);
+    //
+    //     let i = boolean_op(
+    //         edge_intersection_float,
+    //         vec![&p1],
+    //         vec![&p2],
+    //         Operation::Intersection,
+    //         PolygonSemantics::XOR
+    //     );
+    //     println!("{:?}", i);
+    //     assert_eq!(i.len(), 1);
+    //     assert_eq!(i.polygons[0].len(), 4);
+    // }
 
-
-//
-//    #[test]
-//    fn test_random1() {
-//        let seed = 2u8;
-//        let seed1 = [seed + 0; 32];
-//        let seed2 = [seed + 1; 32];
-//
-//        let between = Uniform::from(0..8);
-//        let mut rng = ChaChaRng::from_seed(seed1);
-//
-//        let mut rand_polygon = |n_points: usize| -> Polygon<f64> {
-//            let points: Vec<(f64, f64)> = (0..n_points).into_iter()
-//                .map(|_| (between.sample(&mut rng) as f64, between.sample(&mut rng) as f64))
-//                .collect();
-//
-//            Polygon::new(&points)
-//        };
-//
-//        for i in 0..4000 {
-//            println!("{:?}", i);
-//
-//            let a = rand_polygon(3);
-//            let b = rand_polygon(3);
-//
-//            println!("a {:?}", a);
-//            println!("b {:?}", b);
-//
-//            let result = boolean_op(
-//                edge_intersection_float,
-//                &[&a],
-//                &[&b],
-//                Operation::Intersection,
-//            );
-//
-//            println!("result {:?}", result);
-//
-//            let a_in_b = a.exterior.iter().all(|&p| b.contains_point_non_oriented(p));
-//            let b_in_a = b.exterior.iter().all(|&p| a.contains_point_non_oriented(p));
-//
-//            // Skip cases where there will be a hole. Not supported yet.
-//            if a_in_b || b_in_a {
-//                continue;
-//            }
-//
-//            // Create grid of probe points.
-//            let mut rng = ChaChaRng::from_seed(seed2);
-//            let num_probe_points = 100;
-//            let probe_points = (0..num_probe_points).into_iter()
-//                .map(|_| (between.sample(&mut rng) as f64, between.sample(&mut rng) as f64));
-//
-//            let mut num_checks = 0usize;
-//            for p in probe_points {
-//                let p = p.into();
-//
-//                let on_border_1 = a.exterior.edges().iter()
-//                    .any(|e| e.contains_point(p).inclusive_bounds());
-//                let on_border_2 = b.exterior.edges().iter()
-//                    .any(|e| e.contains_point(p).inclusive_bounds());
-//
-//                if on_border_1 || on_border_2 {
-//                    // Ignore cases where the probe point lies on the border of the polygon because,
-//                    // there `contains_point` is known to be inconsistent with `boolean_op`.
-//                    continue;
-//                }
-//
-//                let in1 = a.contains_point_non_oriented(p);
-//                let in2 = b.contains_point_non_oriented(p);
-//
-//                let expected = in1 & in2; // Xor
-//
-//                let result_contains_p = result.contains_point_non_oriented(p);
-//                if result_contains_p != expected {
-//                    println!("a {:?}", a);
-//                    println!("b {:?}", b);
-//                    println!("result {:?}", result);
-//                }
-//
-//                assert_eq!(result_contains_p, expected);
-//                num_checks += 1;
-//            }
-//
-//            assert!(num_checks >= num_probe_points / 2);
-//        }
-//    }
+    //
+    //    #[test]
+    //    fn test_random1() {
+    //        let seed = 2u8;
+    //        let seed1 = [seed + 0; 32];
+    //        let seed2 = [seed + 1; 32];
+    //
+    //        let between = Uniform::from(0..8);
+    //        let mut rng = ChaChaRng::from_seed(seed1);
+    //
+    //        let mut rand_polygon = |n_points: usize| -> Polygon<f64> {
+    //            let points: Vec<(f64, f64)> = (0..n_points).into_iter()
+    //                .map(|_| (between.sample(&mut rng) as f64, between.sample(&mut rng) as f64))
+    //                .collect();
+    //
+    //            Polygon::new(&points)
+    //        };
+    //
+    //        for i in 0..4000 {
+    //            println!("{:?}", i);
+    //
+    //            let a = rand_polygon(3);
+    //            let b = rand_polygon(3);
+    //
+    //            println!("a {:?}", a);
+    //            println!("b {:?}", b);
+    //
+    //            let result = boolean_op(
+    //                edge_intersection_float,
+    //                &[&a],
+    //                &[&b],
+    //                Operation::Intersection,
+    //            );
+    //
+    //            println!("result {:?}", result);
+    //
+    //            let a_in_b = a.exterior.iter().all(|&p| b.contains_point_non_oriented(p));
+    //            let b_in_a = b.exterior.iter().all(|&p| a.contains_point_non_oriented(p));
+    //
+    //            // Skip cases where there will be a hole. Not supported yet.
+    //            if a_in_b || b_in_a {
+    //                continue;
+    //            }
+    //
+    //            // Create grid of probe points.
+    //            let mut rng = ChaChaRng::from_seed(seed2);
+    //            let num_probe_points = 100;
+    //            let probe_points = (0..num_probe_points).into_iter()
+    //                .map(|_| (between.sample(&mut rng) as f64, between.sample(&mut rng) as f64));
+    //
+    //            let mut num_checks = 0usize;
+    //            for p in probe_points {
+    //                let p = p.into();
+    //
+    //                let on_border_1 = a.exterior.edges().iter()
+    //                    .any(|e| e.contains_point(p).inclusive_bounds());
+    //                let on_border_2 = b.exterior.edges().iter()
+    //                    .any(|e| e.contains_point(p).inclusive_bounds());
+    //
+    //                if on_border_1 || on_border_2 {
+    //                    // Ignore cases where the probe point lies on the border of the polygon because,
+    //                    // there `contains_point` is known to be inconsistent with `boolean_op`.
+    //                    continue;
+    //                }
+    //
+    //                let in1 = a.contains_point_non_oriented(p);
+    //                let in2 = b.contains_point_non_oriented(p);
+    //
+    //                let expected = in1 & in2; // Xor
+    //
+    //                let result_contains_p = result.contains_point_non_oriented(p);
+    //                if result_contains_p != expected {
+    //                    println!("a {:?}", a);
+    //                    println!("b {:?}", b);
+    //                    println!("result {:?}", result);
+    //                }
+    //
+    //                assert_eq!(result_contains_p, expected);
+    //                num_checks += 1;
+    //            }
+    //
+    //            assert!(num_checks >= num_probe_points / 2);
+    //        }
+    //    }
 }

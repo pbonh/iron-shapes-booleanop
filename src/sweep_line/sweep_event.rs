@@ -5,11 +5,11 @@
 //
 // SPDX-License-Identifier: AGPL-3.0-or-later
 
+use iron_shapes::edge::{Edge, Side};
+use iron_shapes::point::Point;
+use iron_shapes::CoordinateType;
 use std::cell::RefCell;
 use std::rc::{Rc, Weak};
-use iron_shapes::point::Point;
-use iron_shapes::edge::{Edge, Side};
-use iron_shapes::CoordinateType;
 
 use std::cmp::Ordering;
 
@@ -54,14 +54,15 @@ pub struct SweepEvent<T, Ctr, Property = ()> {
     /// Only left events store a property. The field is 'None' for right events.
     /// Can be used to store an ID of the polygon.
     /// For binary boolean operations this field is used to store the polygon type ('clipping' or 'subject').
-    pub property: Option<Property>
+    pub property: Option<Property>,
 }
 
 #[cfg(test)]
 impl<T, Ctr> SweepEvent<T, Ctr, ()>
-    where T: CoordinateType,
-          Ctr: Default {
-
+where
+    T: CoordinateType,
+    Ctr: Default,
+{
     /// Create a new sweep event wrapped into a `Rc`.
     pub fn new_rc(
         edge_id: usize,
@@ -71,13 +72,23 @@ impl<T, Ctr> SweepEvent<T, Ctr, ()>
         other_event: Weak<SweepEvent<T, Ctr>>,
         is_upper_boundary: bool,
     ) -> Rc<SweepEvent<T, Ctr>> {
-        Self::new_rc_with_property(edge_id, point, other_point, is_left_event, other_event, is_upper_boundary, Some(()))
+        Self::new_rc_with_property(
+            edge_id,
+            point,
+            other_point,
+            is_left_event,
+            other_event,
+            is_upper_boundary,
+            Some(()),
+        )
     }
 }
 
 impl<T, Ctr, Property> SweepEvent<T, Ctr, Property>
-    where T: CoordinateType,
-          Ctr: Default {
+where
+    T: CoordinateType,
+    Ctr: Default,
+{
     /// Create a new sweep event wrapped into a `Rc`.
     pub fn new_rc_with_property(
         edge_id: usize,
@@ -88,7 +99,6 @@ impl<T, Ctr, Property> SweepEvent<T, Ctr, Property>
         is_upper_boundary: bool,
         property: Option<Property>,
     ) -> Rc<SweepEvent<T, Ctr, Property>> {
-
         Rc::new(SweepEvent {
             mutable: RefCell::new(MutablePart {
                 other_event,
@@ -101,15 +111,15 @@ impl<T, Ctr, Property> SweepEvent<T, Ctr, Property>
             is_left_event,
             is_upper_boundary,
             edge_id,
-            property
+            property,
         })
-
     }
 }
 
 impl<T, Ctr, Property> SweepEvent<T, Ctr, Property>
-    where T: CoordinateType {
-
+where
+    T: CoordinateType,
+{
     pub fn is_left_event(&self) -> bool {
         self.is_left_event
     }
@@ -151,12 +161,16 @@ impl<T, Ctr, Property> SweepEvent<T, Ctr, Property>
     }
 
     pub fn with_counter<F, R>(&self, mut f: F) -> R
-        where F: FnMut(&Ctr) -> R {
+    where
+        F: FnMut(&Ctr) -> R,
+    {
         f(&self.mutable.borrow().counter)
     }
 
     pub fn with_counter_mut<F, R>(&self, mut f: F) -> R
-        where F: FnMut(&mut Ctr) -> R {
+    where
+        F: FnMut(&mut Ctr) -> R,
+    {
         f(&mut self.mutable.borrow_mut().counter)
     }
 
@@ -191,26 +205,29 @@ impl<T, Ctr, Property> SweepEvent<T, Ctr, Property>
 }
 
 impl<'a, T, Ctr, P> PartialEq for SweepEvent<T, Ctr, P>
-    where T: CoordinateType {
+where
+    T: CoordinateType,
+{
     fn eq(&self, other: &Self) -> bool {
         self.cmp(other) == Ordering::Equal
     }
 }
 
-
-impl<T, Ctr, P> Eq for SweepEvent<T, Ctr, P>
-    where T: CoordinateType {}
-
+impl<T, Ctr, P> Eq for SweepEvent<T, Ctr, P> where T: CoordinateType {}
 
 impl<T, Ctr, P> PartialOrd for SweepEvent<T, Ctr, P>
-    where T: CoordinateType {
+where
+    T: CoordinateType,
+{
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
 impl<'a, T, Ctr, P> Ord for SweepEvent<T, Ctr, P>
-    where T: CoordinateType {
+where
+    T: CoordinateType,
+{
     fn cmp(&self, other: &Self) -> Ordering {
         // Note that the order is reversed at the end because this is used in a max-heap.
 
@@ -224,7 +241,6 @@ impl<'a, T, Ctr, P> Ord for SweepEvent<T, Ctr, P>
                 // Prefer right events over left events (This is needed to efficiently connect the edges later on).
                 match self.is_left_event.cmp(&other.is_left_event) {
                     Ordering::Equal => {
-
                         // Break the tie by the edges.
                         let edge1 = self.get_original_edge();
                         let edge2 = other.get_original_edge();
@@ -252,20 +268,20 @@ impl<'a, T, Ctr, P> Ord for SweepEvent<T, Ctr, P>
 
                                 // Lower boundaries before upper boundaries
                                 // then break ties by the edge_id.
-                                self.is_upper_boundary.cmp(&other.is_upper_boundary)
+                                self.is_upper_boundary
+                                    .cmp(&other.is_upper_boundary)
                                     .then_with(|| self.get_edge_id().cmp(&other.get_edge_id()))
                             }
                         }
                     }
-                    less_or_greater => less_or_greater
+                    less_or_greater => less_or_greater,
                 }
             }
-            less_or_greater => less_or_greater
+            less_or_greater => less_or_greater,
         }
-            .reverse()
+        .reverse()
     }
 }
-
 
 #[cfg(test)]
 mod test {
@@ -296,7 +312,7 @@ mod test {
 
     #[test]
     fn test_prefer_right_events_over_left_events_in_binary_heap() {
-        let left: Rc<SweepEvent<_, ()>>  = SweepEvent::new_rc(
+        let left: Rc<SweepEvent<_, ()>> = SweepEvent::new_rc(
             0,
             (0, 0).into(),
             (0, 0).into(),

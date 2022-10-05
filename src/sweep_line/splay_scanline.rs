@@ -8,21 +8,24 @@
 #![allow(unused)]
 
 use libreda_splay::SplaySet;
-use std::cmp::Ordering;
 use std::borrow::Borrow;
+use std::cmp::Ordering;
 
 /// Scanline based on a splay set.
 pub struct SplayScanLine<T, C>
-    where C: Fn(&T, &T) -> Ordering {
+where
+    C: Fn(&T, &T) -> Ordering,
+{
     content: SplaySet<T, C>,
 }
 
 impl<T, C> SplayScanLine<T, C>
-    where C: Fn(&T, &T) -> Ordering
+where
+    C: Fn(&T, &T) -> Ordering,
 {
     pub fn new(comparator: C) -> SplayScanLine<T, C> {
         SplayScanLine {
-            content: SplaySet::new(comparator)
+            content: SplaySet::new(comparator),
         }
     }
 
@@ -47,7 +50,6 @@ impl<T, C> SplayScanLine<T, C>
     pub fn prev(&self, t: &T) -> Option<&T> {
         self.content.prev(t)
     }
-
 
     pub fn insert(&mut self, t: T) -> bool {
         self.content.insert(t)

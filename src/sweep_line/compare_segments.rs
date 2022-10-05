@@ -8,14 +8,13 @@
 //! Compute the ordering among edges. This is used to keep sweep events in the right ordering
 //! in the scan line.
 
-use std::rc::Rc;
 use std::cmp::Ordering;
 use std::fmt::Debug;
+use std::rc::Rc;
 
+use super::sweep_event::*;
 use iron_shapes::edge::{Edge, Side};
 use iron_shapes::CoordinateType;
-use super::sweep_event::*;
-
 
 /// Compare two edges.
 /// Returns `Less` if the starting point of `second` is below `first` and `Greater` if it is above.
@@ -35,13 +34,11 @@ fn compare_edges<T: CoordinateType>(first: &Edge<T>, second: &Edge<T>) -> Orderi
     match first.side_of(second.start) {
         Side::Left => Ordering::Less,
         Side::Right => Ordering::Greater,
-        Side::Center => {
-            match first.side_of(second.end) {
-                Side::Left => Ordering::Less,
-                Side::Right => Ordering::Greater,
-                Side::Center => Ordering::Equal
-            }
-        }
+        Side::Center => match first.side_of(second.end) {
+            Side::Left => Ordering::Less,
+            Side::Right => Ordering::Greater,
+            Side::Center => Ordering::Equal,
+        },
     }
 }
 
@@ -55,12 +52,14 @@ fn compare_edges<T: CoordinateType>(first: &Edge<T>, second: &Edge<T>) -> Orderi
 ///
 /// When used correctly the sweep events are sorted by the ascending y-coordinate of their
 /// intersection point with the scan line.
-pub fn compare_events_by_segments<T, Ctr, P>(le1: &Rc<SweepEvent<T, Ctr, P>>,
-                                     le2: &Rc<SweepEvent<T, Ctr, P>>) -> Ordering
-    where
-        T: CoordinateType + Debug,
+pub fn compare_events_by_segments<T, Ctr, P>(
+    le1: &Rc<SweepEvent<T, Ctr, P>>,
+    le2: &Rc<SweepEvent<T, Ctr, P>>,
+) -> Ordering
+where
+    T: CoordinateType + Debug,
 {
-//    let tolerance = 1e-12;
+    //    let tolerance = 1e-12;
 
     debug_assert!(le1.is_left_event());
     debug_assert!(le2.is_left_event());
@@ -69,7 +68,6 @@ pub fn compare_events_by_segments<T, Ctr, P>(le1: &Rc<SweepEvent<T, Ctr, P>>,
     if Rc::ptr_eq(&le1, &le2) {
         return Ordering::Equal;
     }
-
 
     // let edge1 = le1.get_original_edge();
     // let edge2 = le2.get_original_edge();
@@ -88,14 +86,17 @@ pub fn compare_events_by_segments<T, Ctr, P>(le1: &Rc<SweepEvent<T, Ctr, P>>,
         "The edges must overlap in their x-coordinates to be in the scan-line at the same point in time."
     );
 
-//       TODO: if edge1.is_collinear_approx(edge2, tolerance) {
+    //       TODO: if edge1.is_collinear_approx(edge2, tolerance) {
     if edge1.is_collinear(&edge2) {
         // Segments are collinear, thus they intersect the scan line in the same point.
 
         // Break the tie as follows:
         // Lower boundaries before upper boundaries
         // then break ties by the edge_id.
-        edge1.start.partial_cmp(&edge2.start).unwrap()
+        edge1
+            .start
+            .partial_cmp(&edge2.start)
+            .unwrap()
             .then_with(|| le1.is_upper_boundary.cmp(&le2.is_upper_boundary))
             .then_with(|| le1.get_edge_id().cmp(&le2.get_edge_id()))
     } else {
@@ -115,8 +116,10 @@ pub fn compare_events_by_segments<T, Ctr, P>(le1: &Rc<SweepEvent<T, Ctr, P>>,
             }
         } else if edge1.start.x == edge2.start.x {
             // Different left endpoint: use the left endpoint to sort
-            debug_assert!(edge1.start.y != edge2.start.y,
-                          "Case of equality must be handled before.");
+            debug_assert!(
+                edge1.start.y != edge2.start.y,
+                "Case of equality must be handled before."
+            );
 
             if edge1.start.y < edge2.start.y {
                 Ordering::Less
@@ -126,7 +129,10 @@ pub fn compare_events_by_segments<T, Ctr, P>(le1: &Rc<SweepEvent<T, Ctr, P>>,
         } else {
             // Left end points differ in both x and y coordinates.
 
-            debug_assert!(edge1.start.x != edge2.start.x, "x-coordinate should not be equal here.");
+            debug_assert!(
+                edge1.start.x != edge2.start.x,
+                "x-coordinate should not be equal here."
+            );
 
             let edge_cmp_result = if edge1.start.x < edge2.start.x {
                 compare_edges(&edge1, &edge2)
@@ -149,7 +155,10 @@ mod test {
         left: (f64, f64),
         right: (f64, f64),
         polygon_type: PolygonType,
-    ) -> (Rc<SweepEvent<f64, (), PolygonType>>, Rc<SweepEvent<f64, (), PolygonType>>) {
+    ) -> (
+        Rc<SweepEvent<f64, (), PolygonType>>,
+        Rc<SweepEvent<f64, (), PolygonType>>,
+    ) {
         let other = SweepEvent::new_rc_with_property(
             event_id,
             right.into(),
@@ -157,7 +166,7 @@ mod test {
             false,
             Weak::new(),
             false,
-            Some(polygon_type)
+            Some(polygon_type),
         );
         let event = SweepEvent::new_rc_with_property(
             event_id,
@@ -166,7 +175,7 @@ mod test {
             true,
             Rc::downgrade(&other),
             false,
-            Some(polygon_type)
+            Some(polygon_type),
         );
         other.set_other_event(&event);
 
@@ -175,16 +184,18 @@ mod test {
 
     fn simple_event_pair(
         left: (f64, f64),
-        right: (f64, f64)) -> (Rc<SweepEvent<f64, (), PolygonType>>, Rc<SweepEvent<f64, (), PolygonType>>) {
+        right: (f64, f64),
+    ) -> (
+        Rc<SweepEvent<f64, (), PolygonType>>,
+        Rc<SweepEvent<f64, (), PolygonType>>,
+    ) {
         make_event_pair(0, left, right, PolygonType::Clipping)
     }
 
     #[test]
     fn not_collinear_shared_left_right_first() {
-        let (se1, _other1) =
-            simple_event_pair((0.0, 0.0), (1.0, 1.0));
-        let (se2, _other2) =
-            simple_event_pair((0.0, 0.0), (2.0, 2.1));
+        let (se1, _other1) = simple_event_pair((0.0, 0.0), (1.0, 1.0));
+        let (se2, _other2) = simple_event_pair((0.0, 0.0), (2.0, 2.1));
 
         assert_eq!(compare_events_by_segments(&se1, &se2), Ordering::Less);
         assert_eq!(compare_events_by_segments(&se2, &se1), Ordering::Greater);
@@ -192,15 +203,12 @@ mod test {
 
     #[test]
     fn not_collinear_different_left_right_sort_y() {
-        let (se1, _other1) =
-            simple_event_pair((0.0, 1.0), (1.0, 1.0));
-        let (se2, _other2) =
-            simple_event_pair((0.0, 2.0), (2.0, 3.0));
+        let (se1, _other1) = simple_event_pair((0.0, 1.0), (1.0, 1.0));
+        let (se2, _other2) = simple_event_pair((0.0, 2.0), (2.0, 3.0));
 
         assert_eq!(compare_events_by_segments(&se1, &se2), Ordering::Less);
         assert_eq!(compare_events_by_segments(&se2, &se1), Ordering::Greater);
     }
-
 
     #[test]
     fn not_collinear_order_in_sweep_line() {
@@ -238,21 +246,16 @@ mod test {
     fn test_both_vertical_same_start() {
         // Two verticals with same start point should be ordered by event_id.
 
-
-        let (se1, _other1) =
-            make_event_pair(0, (0.0, 0.0), (0.0, 1.0), PolygonType::Clipping);
-        let (se2, _other2) =
-            make_event_pair(1, (0.0, 0.0), (0.0, 2.0), PolygonType::Clipping);
+        let (se1, _other1) = make_event_pair(0, (0.0, 0.0), (0.0, 1.0), PolygonType::Clipping);
+        let (se2, _other2) = make_event_pair(1, (0.0, 0.0), (0.0, 2.0), PolygonType::Clipping);
 
         // Break tie by event_id.
         assert_eq!(compare_events_by_segments(&se1, &se2), Ordering::Less);
         assert_eq!(compare_events_by_segments(&se2, &se1), Ordering::Greater);
 
         // Swap event ids.
-        let (se1, _other1) =
-            make_event_pair(1, (0.0, 0.0), (0.0, 1.0), PolygonType::Clipping);
-        let (se2, _other2) =
-            make_event_pair(0, (0.0, 0.0), (0.0, 2.0), PolygonType::Clipping);
+        let (se1, _other1) = make_event_pair(1, (0.0, 0.0), (0.0, 1.0), PolygonType::Clipping);
+        let (se2, _other2) = make_event_pair(0, (0.0, 0.0), (0.0, 2.0), PolygonType::Clipping);
 
         // Break tie by event_id.
         assert_eq!(compare_events_by_segments(&se1, &se2), Ordering::Greater);

@@ -7,16 +7,15 @@
 
 //! Connect the resulting edges of the sweep line algorithm into polygons.
 
-use iron_shapes::CoordinateType;
 use super::sweep_line::sweep_event::SweepEvent;
 use super::Operation;
-use std::rc::Rc;
-use std::fmt::Debug;
-use iron_shapes::polygon::Polygon;
-use iron_shapes::point::Point;
-use iron_shapes::simple_polygon::SimplePolygon;
 use crate::PolygonSemantics;
-
+use iron_shapes::point::Point;
+use iron_shapes::polygon::Polygon;
+use iron_shapes::simple_polygon::SimplePolygon;
+use iron_shapes::CoordinateType;
+use std::fmt::Debug;
+use std::rc::Rc;
 
 /// Given the processed and sorted events, connect the edges to polygons.
 ///
@@ -27,10 +26,11 @@ pub fn connect_edges<T, Ctr, P, ContributesToResultFn>(
     sorted_events: &[Rc<SweepEvent<T, Ctr, P>>],
     operation: Operation,
     polygon_semantics: PolygonSemantics,
-    contributes_to_result: ContributesToResultFn) -> Vec<Polygon<T>>
-    where
-        T: CoordinateType + Debug,
-        ContributesToResultFn: Fn(&SweepEvent<T, Ctr, P>) -> bool
+    contributes_to_result: ContributesToResultFn,
+) -> Vec<Polygon<T>>
+where
+    T: CoordinateType + Debug,
+    ContributesToResultFn: Fn(&SweepEvent<T, Ctr, P>) -> bool,
 {
     let mut relevant_events = filter_events(sorted_events, contributes_to_result);
 
@@ -58,10 +58,7 @@ pub fn connect_edges<T, Ctr, P, ContributesToResultFn>(
         // Sanity check: There must be an even number of unprocessed events,
         // because events always come in pairs.
         debug_assert!(
-            processed
-                .iter()
-                .filter(|&&b| !b)
-                .count() % 2 == 0,
+            processed.iter().filter(|&&b| !b).count() % 2 == 0,
             "Expect to have an even number of non-processed events."
         );
 
@@ -69,14 +66,17 @@ pub fn connect_edges<T, Ctr, P, ContributesToResultFn>(
         debug_assert!(
             (0..events.len())
                 .into_iter()
-                .filter_map(|i| if processed[i] { None } else {
+                .filter_map(|i| if processed[i] {
+                    None
+                } else {
                     if events[i].is_left_event {
                         Some(1)
                     } else {
                         Some(-1)
                     }
                 })
-                .fold(0, |a, b| a + b) == 0,
+                .fold(0, |a, b| a + b)
+                == 0,
             "Expect to have the same amount of left and right events."
         );
 
@@ -88,7 +88,8 @@ pub fn connect_edges<T, Ctr, P, ContributesToResultFn>(
 
         // Find contour index if this is a hole.
 
-        let is_hull = initial_event.prev_index
+        let is_hull = initial_event
+            .prev_index
             .map(|prev| {
                 let prev_event = &events[prev];
                 if prev_event.is_upper_boundary {
@@ -104,7 +105,8 @@ pub fn connect_edges<T, Ctr, P, ContributesToResultFn>(
         let polygon_id = if is_hull {
             polygons.len()
         } else {
-            initial_event.prev_index
+            initial_event
+                .prev_index
                 .map(|prev| events[prev].contour_id)
                 // If there is no previous segment, this is a contour and not a hole.
                 // Create a new polygon id.
@@ -112,7 +114,10 @@ pub fn connect_edges<T, Ctr, P, ContributesToResultFn>(
         };
 
         let initial_point = initial_event.p;
-        debug_assert!(initial_event.is_left_event, "Initial event is expected to be a left event.");
+        debug_assert!(
+            initial_event.is_left_event,
+            "Initial event is expected to be a left event."
+        );
 
         // Follow the lines until the contour is closed.
         loop {
@@ -143,8 +148,10 @@ pub fn connect_edges<T, Ctr, P, ContributesToResultFn>(
             processed[pointer] = true;
             processed[other_pointer] = true;
 
-            debug_assert!(event.is_left_event ^ other_event.is_left_event,
-                          "Need to get exactly one left event and one right event.");
+            debug_assert!(
+                event.is_left_event ^ other_event.is_left_event,
+                "Need to get exactly one left event and one right event."
+            );
 
             if other_event.p == initial_point {
                 // Contour is closed.
@@ -158,7 +165,6 @@ pub fn connect_edges<T, Ctr, P, ContributesToResultFn>(
                 break;
             }
         }
-
 
         if polygon_id < polygons.len() {
             // Add hole to existing polygon.
@@ -192,15 +198,16 @@ struct Event<T: CoordinateType> {
     contour_id: usize,
 }
 
-
 /// Take all the events that contribute to the result.
 /// This depends on the boolean operation to be performed.
 /// Also adjusts the `prev` pointers for hole attribution.
 fn filter_events<T, Ctr, P, ContributesToResultFn>(
     sorted_events: &[Rc<SweepEvent<T, Ctr, P>>],
-    contributes_to_result: ContributesToResultFn) -> Vec<Rc<SweepEvent<T, Ctr, P>>>
-    where T: CoordinateType + Debug,
-          ContributesToResultFn: Fn(&SweepEvent<T, Ctr, P>) -> bool
+    contributes_to_result: ContributesToResultFn,
+) -> Vec<Rc<SweepEvent<T, Ctr, P>>>
+where
+    T: CoordinateType + Debug,
+    ContributesToResultFn: Fn(&SweepEvent<T, Ctr, P>) -> bool,
 {
     // Flags that tell whether the event contributes to the result or not.
     let mut contributes = vec![false; sorted_events.len()];
@@ -211,8 +218,9 @@ fn filter_events<T, Ctr, P, ContributesToResultFn>(
         let contributes_to_result = if event.is_left_event() {
             contributes_to_result(event)
         } else {
-            event.get_other_event().map(|other|
-                contributes_to_result(other.as_ref()))
+            event
+                .get_other_event()
+                .map(|other| contributes_to_result(other.as_ref()))
                 .unwrap_or(false)
         };
 
@@ -237,7 +245,8 @@ fn filter_events<T, Ctr, P, ContributesToResultFn>(
     }
 
     // Filter relevant events.
-    let result_events: Vec<_> = sorted_events.iter()
+    let result_events: Vec<_> = sorted_events
+        .iter()
         .zip(contributes)
         .filter(|(_e, contributes)| *contributes)
         .map(|(e, _)| e)
@@ -247,8 +256,12 @@ fn filter_events<T, Ctr, P, ContributesToResultFn>(
 }
 
 /// Remove duplicate edges which would form empty polygons.
-fn xor_cancel_double_edges<T, Ctr, P>(sorted_events: Vec<Rc<SweepEvent<T, Ctr, P>>>) -> Vec<Rc<SweepEvent<T, Ctr, P>>>
-    where T: CoordinateType + Debug {
+fn xor_cancel_double_edges<T, Ctr, P>(
+    sorted_events: Vec<Rc<SweepEvent<T, Ctr, P>>>,
+) -> Vec<Rc<SweepEvent<T, Ctr, P>>>
+where
+    T: CoordinateType + Debug,
+{
     // Flags that tell whether the event contributes to the result or not.
     let mut contributes = vec![false; sorted_events.len()];
 
@@ -304,7 +317,8 @@ fn xor_cancel_double_edges<T, Ctr, P>(sorted_events: Vec<Rc<SweepEvent<T, Ctr, P
     }
 
     // Filter relevant events.
-    sorted_events.into_iter()
+    sorted_events
+        .into_iter()
         .zip(contributes)
         .filter(|(_e, contributes)| *contributes)
         .map(|(e, _)| e)
@@ -314,10 +328,9 @@ fn xor_cancel_double_edges<T, Ctr, P>(sorted_events: Vec<Rc<SweepEvent<T, Ctr, P
 /// Sort the events and insert indices.
 /// Input events must already be filtered such that they only contain relevant events.
 fn order_events<T, Ctr, P>(events: &mut Vec<Rc<SweepEvent<T, Ctr, P>>>) -> Vec<Event<T>>
-    where
-        T: CoordinateType,
+where
+    T: CoordinateType,
 {
-
     // Sort the events.
     // The events are probably almost sorted.
     let mut sorted = false;
@@ -332,12 +345,13 @@ fn order_events<T, Ctr, P>(events: &mut Vec<Rc<SweepEvent<T, Ctr, P>>>) -> Vec<E
     }
 
     // Check if events are sorted.
-    debug_assert!(events.windows(2).all(|e| e[0] >= e[1]),
-                  "Must be sorted.");
+    debug_assert!(events.windows(2).all(|e| e[0] >= e[1]), "Must be sorted.");
 
     // And check if events are sorted by coordinates too.
-    debug_assert!(events.windows(2).all(|e| e[0].p <= e[1].p),
-                  "Must be sorted by coordinates.");
+    debug_assert!(
+        events.windows(2).all(|e| e[0].p <= e[1].p),
+        "Must be sorted by coordinates."
+    );
 
     // Sorted by coordinates implies that end-point and start-point of two connected edges are close together in the list.
     // Further, the start-point of the second edge will come after the end-point of the first edge.
@@ -360,35 +374,37 @@ fn order_events<T, Ctr, P>(events: &mut Vec<Rc<SweepEvent<T, Ctr, P>>>) -> Vec<E
     }
 
     // Convert the events into a simpler data structure.
-    let result = events.iter().enumerate()
+    let result = events
+        .iter()
+        .enumerate()
         .map(|(index, event)| {
             Event {
                 index,
                 other_index: event.get_pos(),
-                prev_index: event.get_prev().upgrade()
-                    .map(|p| p.get_pos()),
+                prev_index: event.get_prev().upgrade().map(|p| p.get_pos()),
                 p: event.p,
                 is_left_event: event.is_left_event(),
                 is_hole: false,
                 is_upper_boundary: false, // TODO: Is this used?
                 contour_id: usize::MAX,
             }
-        }
-        ).collect();
+        })
+        .collect();
 
     result
 }
 
 /// Given an index of an event get the index of another event with the same coordinates that is not yet
 /// marked as used.
-fn next_index<T: CoordinateType>(events: &[Event<T>],
-                                 start_index: usize,
-                                 used: &[bool]) -> Option<usize> {
+fn next_index<T: CoordinateType>(
+    events: &[Event<T>],
+    start_index: usize,
+    used: &[bool],
+) -> Option<usize> {
     debug_assert!(start_index < events.len());
     debug_assert!(events.len() == used.len());
 
     let event = &events[start_index];
-
 
     // Find the next event by linear search in both directions.
     let point = event.p;
@@ -400,22 +416,20 @@ fn next_index<T: CoordinateType>(events: &[Event<T>],
         .find(|e| !used[e.index])
         .map(|e|
             // Return the index of this event.
-            e.index
-        );
+            e.index);
 
     if next_to_the_right.is_some() {
         next_to_the_right
     } else {
         // Search to the left.
         let next_to_the_left = events[0..start_index]
-            .iter().rev()
+            .iter()
+            .rev()
             .take_while(|e| e.p == point)
             .find(|e| !used[e.index])
             .map(|e|
                 // Return the index of this event.
-                e.index
-            );
+                e.index);
         next_to_the_left
     }
 }
-

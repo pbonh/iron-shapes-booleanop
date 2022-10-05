@@ -6,16 +6,20 @@ use iron_shapes::edge::EdgeEndpoints;
 use std::collections::BinaryHeap;
 use std::rc::{Rc, Weak};
 
-use iron_shapes::prelude::{CoordinateType};
+use iron_shapes::prelude::CoordinateType;
 
 use crate::sweep_line::sweep_event::SweepEvent;
 
 /// Insert the edges of the polygons into the event queue.
-pub fn fill_queue<Coord, Ctr, Edge, Property>(edges: impl Iterator<Item=(Edge, Property)>) -> BinaryHeap<Rc<SweepEvent<Coord, Ctr, Property>>>
-    where Coord: CoordinateType,
-          Edge: EdgeEndpoints<Coord>,
-          Ctr: Default,
-          Property: Clone, {
+pub fn fill_queue<Coord, Ctr, Edge, Property>(
+    edges: impl Iterator<Item = (Edge, Property)>,
+) -> BinaryHeap<Rc<SweepEvent<Coord, Ctr, Property>>>
+where
+    Coord: CoordinateType,
+    Edge: EdgeEndpoints<Coord>,
+    Ctr: Default,
+    Property: Clone,
+{
     let mut event_queue = BinaryHeap::new();
     let mut event_id_generator = (1..).into_iter();
 
@@ -63,7 +67,6 @@ pub fn fill_queue<Coord, Ctr, Edge, Property>(edges: impl Iterator<Item=(Edge, P
             event_queue.push(event_b);
         }
     }
-
 
     event_queue
 }

@@ -8,8 +8,8 @@ pub mod sweep_event;
 
 pub mod intersection;
 
-mod compare_segments;
-mod possible_intersection;
-mod naive_scanline;
 mod btree_scanline;
+mod compare_segments;
+mod naive_scanline;
+mod possible_intersection;
 mod splay_scanline;

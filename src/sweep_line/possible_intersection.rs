@@ -7,53 +7,64 @@
 
 use std::collections::binary_heap::BinaryHeap;
 
-use std::rc::Rc;
 use std::cmp::Ordering;
 use std::fmt::Debug;
+use std::rc::Rc;
 
-use iron_shapes::point::Point;
 use iron_shapes::edge::{Edge, EdgeIntersection};
+use iron_shapes::point::Point;
 use iron_shapes::CoordinateType;
 
-use super::sweep_event::*;
 use super::compare_segments::compare_events_by_segments;
+use super::sweep_event::*;
 
 /// Split a segment into two segments at the intersection point `inter` and push the new events into the queue.
-fn divide_segment<T, Ctr, Property>(event: &Rc<SweepEvent<T, Ctr, Property>>,
-                                    inter: Point<T>,
-                                    queue: &mut BinaryHeap<Rc<SweepEvent<T, Ctr, Property>>>)
-    where
-        T: CoordinateType + Debug,
-        Ctr: Default,
-        Property: Clone,
+fn divide_segment<T, Ctr, Property>(
+    event: &Rc<SweepEvent<T, Ctr, Property>>,
+    inter: Point<T>,
+    queue: &mut BinaryHeap<Rc<SweepEvent<T, Ctr, Property>>>,
+) where
+    T: CoordinateType + Debug,
+    Ctr: Default,
+    Property: Clone,
 {
     debug_assert!(event.is_left_event());
 
     if let Some(other_event) = event.get_other_event() {
-        debug_assert!({
-                          // Check that the point where the segment is split is really on the segment.
-                          let edge = event.get_edge().unwrap();
+        debug_assert!(
+            {
+                // Check that the point where the segment is split is really on the segment.
+                let edge = event.get_edge().unwrap();
 
-                          // Calculate area of rhomboid spanned by edge and intersection point.
-                          let a = edge.vector();
-                          let b = inter - edge.start;
-                          let area = b.cross_prod(a);
+                // Calculate area of rhomboid spanned by edge and intersection point.
+                let a = edge.vector();
+                let b = inter - edge.start;
+                let area = b.cross_prod(a);
 
-                          let tol = T::one();
-                          area >= T::zero() - tol && area <= tol
-                      }, "`inter` is not an intersection point.");
+                let tol = T::one();
+                area >= T::zero() - tol && area <= tol
+            },
+            "`inter` is not an intersection point."
+        );
 
-        debug_assert!({
-                          // Check that the edge is well defined.
-                          let edge = event.get_edge().unwrap();
-                          !edge.is_degenerate()
-                      }, "Degenerate edge detected.");
+        debug_assert!(
+            {
+                // Check that the edge is well defined.
+                let edge = event.get_edge().unwrap();
+                !edge.is_degenerate()
+            },
+            "Degenerate edge detected."
+        );
 
-        debug_assert!(event.p != inter && other_event.p != inter,
-                      "Intersection point must not lie on the end-points.");
+        debug_assert!(
+            event.p != inter && other_event.p != inter,
+            "Intersection point must not lie on the end-points."
+        );
 
-        debug_assert!(event.p < inter && inter < other_event.p,
-                      "Intersection point must lie on the edge but not on the end-points.");
+        debug_assert!(
+            event.p < inter && inter < other_event.p,
+            "Intersection point must lie on the edge but not on the end-points."
+        );
 
         let r = SweepEvent::new_rc_with_property(
             event.get_edge_id(),
@@ -92,13 +103,14 @@ fn divide_segment<T, Ctr, Property>(event: &Rc<SweepEvent<T, Ctr, Property>>,
         debug_assert!(l.is_left_event() ^ l.get_other_event().unwrap().is_left_event());
         debug_assert!(r.is_left_event() ^ r.get_other_event().unwrap().is_left_event());
         debug_assert!(event.is_left_event() ^ event.get_other_event().unwrap().is_left_event());
-        debug_assert!(other_event.is_left_event() ^ other_event.get_other_event().unwrap().is_left_event());
+        debug_assert!(
+            other_event.is_left_event() ^ other_event.get_other_event().unwrap().is_left_event()
+        );
 
         queue.push(l);
         queue.push(r);
     }
 }
-
 
 /// Check two neighboring events for intersection and make necessary modifications to them and the queue.
 ///
@@ -115,11 +127,11 @@ pub fn possible_intersection<F, I, Ctr, P>(
     // Event queue.
     queue: &mut BinaryHeap<Rc<SweepEvent<F, Ctr, P>>>,
 ) -> bool
-    where
-        F: CoordinateType + Debug,
-        I: Fn(&Edge<F>, &Edge<F>) -> EdgeIntersection<F, F, Edge<F>>,
-        Ctr: Default,
-        P: Clone
+where
+    F: CoordinateType + Debug,
+    I: Fn(&Edge<F>, &Edge<F>) -> EdgeIntersection<F, F, Edge<F>>,
+    Ctr: Default,
+    P: Clone,
 {
     debug_assert!(event1.is_left_event());
     debug_assert!(event2.is_left_event());
@@ -135,8 +147,11 @@ pub fn possible_intersection<F, I, Ctr, P>(
     debug_assert!(edge2.start <= edge2.end);
 
     // event1 must come before event2 in the scan line.
-    debug_assert_eq!(compare_events_by_segments(event1, event2), Ordering::Less,
-                     "Wrong ordering.");
+    debug_assert_eq!(
+        compare_events_by_segments(event1, event2),
+        Ordering::Less,
+        "Wrong ordering."
+    );
 
     match edge_intersection_fn(&edge1, &edge2) {
         EdgeIntersection::None => false,
@@ -146,13 +161,15 @@ pub fn possible_intersection<F, I, Ctr, P>(
             true
         }
         EdgeIntersection::EndPoint(p) => {
-            debug_assert!(edge1.start == p || edge1.end == p || edge2.start == p || edge2.end == p,
-                          "`p` is expected to be an end-point but is not.");
+            debug_assert!(
+                edge1.start == p || edge1.end == p || edge2.start == p || edge2.end == p,
+                "`p` is expected to be an end-point but is not."
+            );
 
-            debug_assert!({
-                              p.x >= edge1.start.x && p.x >= edge2.start.x
-                          },
-                          "Intersection lies left of both edges.");
+            debug_assert!(
+                { p.x >= edge1.start.x && p.x >= edge2.start.x },
+                "Intersection lies left of both edges."
+            );
 
             if p != edge1.start && p != edge1.end {
                 // `p` is not an endpoint of event1.

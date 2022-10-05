@@ -12,15 +12,16 @@ use std::cmp::Ordering;
 
 /// Naive and inefficient implementation of the data structure used for the scan line.
 pub struct NaiveScanLine<K, C>
-    where C: Fn(&K, &K) -> Ordering,
+where
+    C: Fn(&K, &K) -> Ordering,
 {
     comparator: C,
     content: Vec<K>,
 }
 
 impl<T, C> NaiveScanLine<T, C>
-    where
-        C: Fn(&T, &T) -> Ordering,
+where
+    C: Fn(&T, &T) -> Ordering,
 {
     pub fn new(comparator: C) -> NaiveScanLine<T, C> {
         NaiveScanLine {
@@ -48,19 +49,22 @@ impl<T, C> NaiveScanLine<T, C>
     }
 
     pub fn next(&self, t: &T) -> Option<&T> {
-        self.content.iter()
+        self.content
+            .iter()
             .filter(|e| (&self.comparator)(e, t) == Ordering::Greater)
             .min_by(|a, b| (&self.comparator)(a, b))
     }
 
     pub fn prev(&self, t: &T) -> Option<&T> {
-        self.content.iter()
+        self.content
+            .iter()
             .filter(|e| (&self.comparator)(e, t) == Ordering::Less)
             .max_by(|a, b| (&self.comparator)(a, b))
     }
 
     fn find_index(&self, t: &T) -> Option<(usize, &T)> {
-        self.content.iter()
+        self.content
+            .iter()
             .enumerate()
             .find(|(index, e)| (&self.comparator)(e, t) == Ordering::Equal)
     }

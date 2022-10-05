@@ -7,17 +7,17 @@
 
 use std::collections::binary_heap::BinaryHeap;
 
-use std::rc::Rc;
 use iron_shapes::edge::{Edge, EdgeIntersection};
 use num_rational::Ratio;
+use std::rc::Rc;
 
 use iron_shapes::CoordinateType;
-use num_traits::{Float, PrimInt};
-use std::fmt::Debug;
-use std::ops::Deref;
-use std::cmp::Ordering;
 use itertools::Itertools;
 use num_integer::Integer;
+use num_traits::{Float, PrimInt};
+use std::cmp::Ordering;
+use std::fmt::Debug;
+use std::ops::Deref;
 
 use super::sweep_event::*;
 
@@ -28,30 +28,41 @@ use super::possible_intersection::possible_intersection;
 use super::btree_scanline::BTreeScanLine;
 // use super::naive_scanline::NaiveScanLine;
 
-
 /// Compute approximate intersection point of two edges in floating point coordinates.
-pub fn edge_intersection_float<F: Float>(e1: &Edge<F>, e2: &Edge<F>) -> EdgeIntersection<F, F, Edge<F>> {
+pub fn edge_intersection_float<F: Float>(
+    e1: &Edge<F>,
+    e2: &Edge<F>,
+) -> EdgeIntersection<F, F, Edge<F>> {
     e1.edge_intersection_approx(e2, F::from(1e-8).unwrap())
 }
 
 /// Compute the intersection of edges with rational coordinates.
 /// In rational coordinates intersections can be computed exactly.
-pub fn edge_intersection_rational<T>(e1: &Edge<Ratio<T>>, e2: &Edge<Ratio<T>>)
-                                     -> EdgeIntersection<Ratio<T>, Ratio<T>, Edge<Ratio<T>>>
-    where T: CoordinateType + Integer {
+pub fn edge_intersection_rational<T>(
+    e1: &Edge<Ratio<T>>,
+    e2: &Edge<Ratio<T>>,
+) -> EdgeIntersection<Ratio<T>, Ratio<T>, Edge<Ratio<T>>>
+where
+    T: CoordinateType + Integer,
+{
     e1.edge_intersection_rational(e2)
 }
 
 /// Compute intersection of edges in integer coordinates.
 /// For edges that are parallel to the x or y axis the intersection can be computed exactly.
 /// For others it will be rounded.
-pub fn edge_intersection_integer<T: PrimInt + Debug>(e1: &Edge<T>, e2: &Edge<T>) -> EdgeIntersection<T, T, Edge<T>> {
+pub fn edge_intersection_integer<T: PrimInt + Debug>(
+    e1: &Edge<T>,
+    e2: &Edge<T>,
+) -> EdgeIntersection<T, T, Edge<T>> {
     e1.edge_intersection_rounded(e2)
 }
 
 /// Wrap a SweepEvent in order to use another implementation of `Ord` which is needed for the scanline.
 #[derive(Clone)]
-struct ScanlineElement<T, Ctr, P>(Rc<SweepEvent<T, Ctr, P>>) where T: CoordinateType;
+struct ScanlineElement<T, Ctr, P>(Rc<SweepEvent<T, Ctr, P>>)
+where
+    T: CoordinateType;
 
 impl<T: PartialEq + CoordinateType, Ctr, P> PartialEq for ScanlineElement<T, Ctr, P> {
     fn eq(&self, other: &Self) -> bool {
@@ -62,7 +73,9 @@ impl<T: PartialEq + CoordinateType, Ctr, P> PartialEq for ScanlineElement<T, Ctr
 impl<T: PartialEq + CoordinateType, Ctr, P> Eq for ScanlineElement<T, Ctr, P> {}
 
 impl<T, Ctr, P> Deref for ScanlineElement<T, Ctr, P>
-    where T: CoordinateType {
+where
+    T: CoordinateType,
+{
     type Target = Rc<SweepEvent<T, Ctr, P>>;
 
     fn deref(&self) -> &Self::Target {
@@ -71,14 +84,18 @@ impl<T, Ctr, P> Deref for ScanlineElement<T, Ctr, P>
 }
 
 impl<T, Ctr, P> Ord for ScanlineElement<T, Ctr, P>
-    where T: CoordinateType + Debug {
+where
+    T: CoordinateType + Debug,
+{
     fn cmp(&self, other: &Self) -> Ordering {
         compare_events_by_segments(self, other)
     }
 }
 
 impl<T, Ctr, P> PartialOrd for ScanlineElement<T, Ctr, P>
-    where T: CoordinateType + Debug {
+where
+    T: CoordinateType + Debug,
+{
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(compare_events_by_segments(self, other))
     }
@@ -86,8 +103,13 @@ impl<T, Ctr, P> PartialOrd for ScanlineElement<T, Ctr, P>
 
 /// Helper function to be used as comparator for the `SplayScanLine`.
 #[allow(unused)]
-fn compare_scanline_elements<T, Ctr, P>(a: &ScanlineElement<T, Ctr, P>, b: &ScanlineElement<T, Ctr, P>) -> Ordering
-    where T: CoordinateType + Debug {
+fn compare_scanline_elements<T, Ctr, P>(
+    a: &ScanlineElement<T, Ctr, P>,
+    b: &ScanlineElement<T, Ctr, P>,
+) -> Ordering
+where
+    T: CoordinateType + Debug,
+{
     compare_events_by_segments(a, b)
 }
 
@@ -99,23 +121,23 @@ pub fn subdivide_segments<T, I, Ctr, P, UpdateCtrFn>(
     event_queue: &mut BinaryHeap<Rc<SweepEvent<T, Ctr, P>>>,
     update_counter: UpdateCtrFn,
 ) -> Vec<Rc<SweepEvent<T, Ctr, P>>>
-    where I: Fn(&Edge<T>, &Edge<T>) -> EdgeIntersection<T, T, Edge<T>>,
-          T: CoordinateType + Debug,
-          Ctr: Clone + Default,
-          P: Clone,
-          UpdateCtrFn: Fn(&Rc<SweepEvent<T, Ctr, P>>, Option<&Rc<SweepEvent<T, Ctr, P>>>)
+where
+    I: Fn(&Edge<T>, &Edge<T>) -> EdgeIntersection<T, T, Edge<T>>,
+    T: CoordinateType + Debug,
+    Ctr: Clone + Default,
+    P: Clone,
+    UpdateCtrFn: Fn(&Rc<SweepEvent<T, Ctr, P>>, Option<&Rc<SweepEvent<T, Ctr, P>>>),
 {
     let mut sorted_events = Vec::new();
     // Reserve the minimum amount of storage necessary.
     sorted_events.reserve(event_queue.len());
-
 
     // let mut scan_line = SplayScanLine::new(compare_scanline_elements);
     let mut scan_line: BTreeScanLine<ScanlineElement<T, Ctr, P>> = BTreeScanLine::new();
     // let mut scan_line = NaiveScanLine::new(compare_scanline_elements);
 
     #[cfg(debug)]
-        let mut scan_line_position = None; // For sanity checks only.
+    let mut scan_line_position = None; // For sanity checks only.
 
     // Process all events.
     while let Some(event) = event_queue.pop() {
@@ -124,7 +146,8 @@ pub fn subdivide_segments<T, I, Ctr, P, UpdateCtrFn>(
 
         let other_event = ScanlineElement(event.get_other_event().unwrap());
 
-        #[cfg(debug)] {
+        #[cfg(debug)]
+        {
             if let Some(pos) = scan_line_position {
                 debug_assert!(event.p.x >= pos, "Events are not ordered by x-coordinate.");
             }
@@ -132,7 +155,10 @@ pub fn subdivide_segments<T, I, Ctr, P, UpdateCtrFn>(
         }
 
         if event.is_left_event() {
-            debug_assert!(!scan_line.contains(&event), "Event is already in the scan line.");
+            debug_assert!(
+                !scan_line.contains(&event),
+                "Event is already in the scan line."
+            );
 
             {
                 let maybe_next = scan_line.next(&event);
@@ -140,13 +166,13 @@ pub fn subdivide_segments<T, I, Ctr, P, UpdateCtrFn>(
                     debug_assert_ne!(compare_events_by_segments(&event, next), Ordering::Greater);
                 }
 
-
                 if let Some(next) = maybe_next {
                     debug_assert!(
                         compare_events_by_segments(&event, next) != Ordering::Greater,
                         "ordering of elements in scanline is wrong"
                     );
-                    let queue_modified = possible_intersection(&edge_intersection, &event, &next, event_queue);
+                    let queue_modified =
+                        possible_intersection(&edge_intersection, &event, &next, event_queue);
                     if queue_modified {
                         scan_line.remove(&event);
                         event_queue.push(event.0);
@@ -162,10 +188,12 @@ pub fn subdivide_segments<T, I, Ctr, P, UpdateCtrFn>(
 
                 if let Some(prev) = maybe_prev {
                     debug_assert_ne!(
-                        compare_events_by_segments(&event, prev), Ordering::Less,
+                        compare_events_by_segments(&event, prev),
+                        Ordering::Less,
                         "ordering of elements in scanline is wrong"
                     );
-                    let queue_modified = possible_intersection(&edge_intersection, &prev, &event, event_queue);
+                    let queue_modified =
+                        possible_intersection(&edge_intersection, &prev, &event, event_queue);
                     if queue_modified {
                         scan_line.remove(&event);
                         event_queue.push(event.0);
@@ -192,7 +220,10 @@ pub fn subdivide_segments<T, I, Ctr, P, UpdateCtrFn>(
             debug_assert!(!event.is_left_event());
             debug_assert!(left_event.is_left_event());
 
-            debug_assert!(scan_line.contains(&left_event), "Left event is not in scan line.");
+            debug_assert!(
+                scan_line.contains(&left_event),
+                "Left event is not in scan line."
+            );
 
             {
                 let maybe_prev = scan_line.prev(&left_event).cloned();
@@ -203,8 +234,7 @@ pub fn subdivide_segments<T, I, Ctr, P, UpdateCtrFn>(
                 // prev and next are possibly new neighbours. Check for intersection.
                 if let (Some(prev), Some(next)) = (maybe_prev, maybe_next) {
                     debug_assert!(compare_events_by_segments(&next, &prev) != Ordering::Less);
-                    possible_intersection(&edge_intersection,
-                                          &prev, &next, event_queue);
+                    possible_intersection(&edge_intersection, &prev, &next, event_queue);
                 }
             }
         }
@@ -217,7 +247,8 @@ pub fn subdivide_segments<T, I, Ctr, P, UpdateCtrFn>(
             let len = sorted_events.len();
 
             // TODO use something faster like galloping search?
-            let pos_back: isize = sorted_events.iter()
+            let pos_back: isize = sorted_events
+                .iter()
                 .rev() // Search from end of vector.
                 .find_position(|&e: &&Rc<SweepEvent<T, Ctr, P>>| e >= &event)
                 .map(|(index, _value)| index as isize)
@@ -225,10 +256,13 @@ pub fn subdivide_segments<T, I, Ctr, P, UpdateCtrFn>(
 
             let pos = (len as isize - pos_back) as usize;
 
-            debug_assert_eq!(pos, sorted_events.iter()
-                .find_position(|&e: &&Rc<SweepEvent<T, Ctr, P>>| e <= &event)
-                .map(|(index, _value)| index)
-                .unwrap_or(len)
+            debug_assert_eq!(
+                pos,
+                sorted_events
+                    .iter()
+                    .find_position(|&e: &&Rc<SweepEvent<T, Ctr, P>>| e <= &event)
+                    .map(|(index, _value)| index)
+                    .unwrap_or(len)
             );
 
             // Insert event at found position.
@@ -236,15 +270,21 @@ pub fn subdivide_segments<T, I, Ctr, P, UpdateCtrFn>(
         }
     }
 
-    debug_assert!(event_queue.is_empty(), "Not all events have been processed.");
+    debug_assert!(
+        event_queue.is_empty(),
+        "Not all events have been processed."
+    );
     debug_assert!(scan_line.is_empty(), "Scan line still contains segments.");
 
-    debug_assert!(sorted_events.windows(2).all(|w| w[0].p <= w[1].p),
-                  "Events are not sorted by points.");
+    debug_assert!(
+        sorted_events.windows(2).all(|w| w[0].p <= w[1].p),
+        "Events are not sorted by points."
+    );
 
-    debug_assert!(sorted_events.windows(2).all(|w| w[0] >= w[1]),
-                  "Events are not sorted.");
-
+    debug_assert!(
+        sorted_events.windows(2).all(|w| w[0] >= w[1]),
+        "Events are not sorted."
+    );
 
     sorted_events
 }

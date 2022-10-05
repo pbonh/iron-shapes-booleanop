@@ -45,19 +45,21 @@
 
 extern crate iron_shapes;
 
-mod connect_edges;
-mod sweep_line;
 mod booleanop;
+mod connect_edges;
 pub mod connectivity_extraction;
 mod init_events;
+mod sweep_line;
 
 use num_rational::{Rational32, Rational64};
 
 // API exports.
 pub use booleanop::{boolean_op, edges_boolean_op};
-pub use sweep_line::intersection::{edge_intersection_float, edge_intersection_integer, edge_intersection_rational};
+pub use sweep_line::intersection::{
+    edge_intersection_float, edge_intersection_integer, edge_intersection_rational,
+};
 
-use iron_shapes::prelude::{CoordinateType, Polygon, MultiPolygon};
+use iron_shapes::prelude::{CoordinateType, MultiPolygon, Polygon};
 
 // /// Abstraction of a line segment or 'edge'.
 // pub trait Segment {
@@ -117,7 +119,12 @@ pub trait BooleanOp<T: CoordinateType> {
     /// * `other`: The other operand. A geometric object of the same type as `self`.
     /// * `polygon_semantics`: Define the 'inside' of a polygon. In case of doubt `Union`-semantics
     /// could be a good choice.
-    fn boolean_op(&self, operation: Operation, other: &Self, polygon_semantics: PolygonSemantics) -> MultiPolygon<T>;
+    fn boolean_op(
+        &self,
+        operation: Operation,
+        other: &Self,
+        polygon_semantics: PolygonSemantics,
+    ) -> MultiPolygon<T>;
 
     /// Compute the boolean intersection `self & other`.
     ///
@@ -150,24 +157,27 @@ pub trait BooleanOp<T: CoordinateType> {
 
 /// Implement the `BooleanOp` trait for `MultiPolygon<...>`.
 macro_rules! impl_booleanop_multipolygon {
- ($coord:ty, $edge_intersection:ident) => {
-     impl BooleanOp<$coord> for MultiPolygon<$coord> {
-        fn boolean_op(&self, operation: Operation, other: &Self, polygon_semantics: PolygonSemantics)
-         -> MultiPolygon<$coord> {
-            let subject = self.all_edges_iter();
-            let clipping = other.all_edges_iter();
-            edges_boolean_op(
-                &$edge_intersection,
-                subject,
-                clipping,
-                operation,
-                polygon_semantics
-            )
+    ($coord:ty, $edge_intersection:ident) => {
+        impl BooleanOp<$coord> for MultiPolygon<$coord> {
+            fn boolean_op(
+                &self,
+                operation: Operation,
+                other: &Self,
+                polygon_semantics: PolygonSemantics,
+            ) -> MultiPolygon<$coord> {
+                let subject = self.all_edges_iter();
+                let clipping = other.all_edges_iter();
+                edges_boolean_op(
+                    &$edge_intersection,
+                    subject,
+                    clipping,
+                    operation,
+                    polygon_semantics,
+                )
+            }
         }
-    }
- }
+    };
 }
-
 
 impl_booleanop_multipolygon!(f32, edge_intersection_float);
 impl_booleanop_multipolygon!(f64, edge_intersection_float);
@@ -179,22 +189,26 @@ impl_booleanop_multipolygon!(Rational64, edge_intersection_rational);
 
 /// Implement the `BooleanOp` trait for `Polygon<...>`.
 macro_rules! impl_booleanop_polygon {
- ($coord:ty, $edge_intersection:ident) => {
-     impl BooleanOp<$coord> for Polygon<$coord> {
-        fn boolean_op(&self, operation: Operation, other: &Self, polygon_semantics: PolygonSemantics)
-        -> MultiPolygon<$coord> {
-            let subject = self.all_edges_iter();
-            let clipping = other.all_edges_iter();
-            edges_boolean_op(
-                &$edge_intersection,
-                subject,
-                clipping,
-                operation,
-                polygon_semantics
-            )
+    ($coord:ty, $edge_intersection:ident) => {
+        impl BooleanOp<$coord> for Polygon<$coord> {
+            fn boolean_op(
+                &self,
+                operation: Operation,
+                other: &Self,
+                polygon_semantics: PolygonSemantics,
+            ) -> MultiPolygon<$coord> {
+                let subject = self.all_edges_iter();
+                let clipping = other.all_edges_iter();
+                edges_boolean_op(
+                    &$edge_intersection,
+                    subject,
+                    clipping,
+                    operation,
+                    polygon_semantics,
+                )
+            }
         }
-    }
- }
+    };
 }
 
 impl_booleanop_polygon!(f32, edge_intersection_float);

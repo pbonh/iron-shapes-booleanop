@@ -9,19 +9,19 @@
 
 #![allow(unused)]
 
+use std::borrow::Borrow;
 use std::cmp::Ordering;
 use std::collections::BTreeSet;
 use std::ops::Bound;
-use std::borrow::Borrow;
 
 /// Data structure for the scan-line based on a BTreeSet.
-pub struct BTreeScanLine<K>
-{
+pub struct BTreeScanLine<K> {
     pub(crate) content: BTreeSet<K>,
 }
 
 impl<T> BTreeScanLine<T>
-    where T: Ord
+where
+    T: Ord,
 {
     pub fn new() -> BTreeScanLine<T> {
         BTreeScanLine {
@@ -40,28 +40,33 @@ impl<T> BTreeScanLine<T>
     }
 
     pub fn contains<Q: ?Sized>(&self, value: &Q) -> bool
-        where
-            T: Borrow<Q> + Ord,
-            Q: Ord,
+    where
+        T: Borrow<Q> + Ord,
+        Q: Ord,
     {
         self.content.contains(value)
     }
 
     pub fn next<Q: ?Sized>(&self, t: &Q) -> Option<&T>
-        where T: Borrow<Q> + Ord,
-              Q: Ord {
-        self.content.range((Bound::Excluded(t), Bound::Unbounded))
+    where
+        T: Borrow<Q> + Ord,
+        Q: Ord,
+    {
+        self.content
+            .range((Bound::Excluded(t), Bound::Unbounded))
             .next()
     }
 
     pub fn prev<Q: ?Sized>(&self, t: &Q) -> Option<&T>
-        where T: Borrow<Q> + Ord,
-              Q: Ord {
-        self.content.range((Bound::Unbounded, Bound::Excluded(t)))
+    where
+        T: Borrow<Q> + Ord,
+        Q: Ord,
+    {
+        self.content
+            .range((Bound::Unbounded, Bound::Excluded(t)))
             .rev()
             .next()
     }
-
 
     pub fn insert(&mut self, t: T) -> bool {
         self.content.insert(t)
