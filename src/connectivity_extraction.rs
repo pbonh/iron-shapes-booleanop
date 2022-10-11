@@ -16,27 +16,60 @@ use std::hash::Hash;
 use std::rc::Rc;
 
 /// Extract a connectivity of a set of polygons.
+/// The polygons are supplied in the form of an interator over the polygon edges. If the supplied edges are inconsistent, e.g. don't form closed polygon shapes,
+/// then the result is undefined.
+///
+/// Each edge must be labelled with the identifier of the polygon it belongs to.
 /// Connectivity is encoded as an iterator over multi-graph edges.
 /// Each consists of the IDs of the two touching polygons and a location where the both polygons touch.
 /// Edges can appear many times.
-pub fn extract_connectivity<'a, I, T, Polygons, ID>(
+///
+/// # Examples
+/// ```
+/// use iron_shapes::prelude::*;
+/// use iron_shapes::traits::Translate;
+/// use iron_shapes_booleanop::connectivity_extraction::*;
+/// use iron_shapes_booleanop::*;
+/// use std::collections::HashSet;
+///
+/// let p0 = Polygon::from(vec![(0f64, 0.), (2., 0.), (2., 2.), (0., 2.)]);
+/// let p1 = p0.translate((1., 1.).into());
+/// let p2 = p0.translate((0., 100.).into()); // Far away, not touching anything.
+///
+/// let polygons = vec![p0, p1, p2];
+///
+/// // Convert the polygons into edges labelled with an identifier of their polygon.
+/// let polygon_edges = polygons
+///     .iter()
+///     .enumerate()
+///     .flat_map(|(id, polygon)| polygon.all_edges_iter().map(move |e| (e, id)));
+///
+/// let connectivity_graph = extract_connectivity_graph(
+///     edge_intersection_float,
+///     polygon_edges,
+///     PolygonSemantics::Union,
+/// );
+///
+/// // p0 and p1 are connected.
+/// assert_eq!(connectivity_graph.get(&0), Some(&HashSet::from([1])));
+/// assert_eq!(connectivity_graph.get(&1), Some(&HashSet::from([0])));
+///
+/// // p2 is not connected to any other polygon.
+/// assert_eq!(connectivity_graph.get(&2), None);
+/// ```
+pub fn extract_connectivity<'a, I, T, ID>(
     edge_intersection: I,
-    polygons: Polygons,
+    polygon_edges: impl Iterator<Item = (Edge<T>, ID)>,
     polygon_semantics: PolygonSemantics,
 ) -> impl Iterator<Item = (ID, ID, Point<T>)>
 where
     I: Fn(&Edge<T>, &Edge<T>) -> EdgeIntersection<T, T, Edge<T>>,
     T: CoordinateType + Debug + 'a,
-    Polygons: IntoIterator<Item = (ID, &'a Polygon<T>)>,
     ID: Clone + Hash + Eq,
 {
     // Prepare the event queue.
     let mut event_queue: BinaryHeap<Rc<SweepEvent<_, Counter<ID>, ID>>> =
-        crate::init_events::fill_queue(
-            polygons
-                .into_iter()
-                .flat_map(|(id, p)| p.all_edges_iter().map(move |edge| (edge, id.clone()))),
-        );
+        crate::init_events::fill_queue(polygon_edges);
 
     // Compute the edge intersections, the result is a set of sorted non-intersecting edges stored
     // as events.
@@ -88,18 +121,18 @@ where
 }
 
 /// Extract a connectivity graph of a set of polygons.
-pub fn extract_connectivity_graph<'a, I, T, Polygons, ID>(
+pub fn extract_connectivity_graph<'a, I, T, ID>(
     edge_intersection: I,
-    polygons: Polygons,
+    polygon_edges: impl Iterator<Item = (Edge<T>, ID)>,
     polygon_semantics: PolygonSemantics,
 ) -> HashMap<ID, HashSet<ID>>
 where
     I: Fn(&Edge<T>, &Edge<T>) -> EdgeIntersection<T, T, Edge<T>>,
     T: CoordinateType + Debug + 'a,
-    Polygons: IntoIterator<Item = (ID, &'a Polygon<T>)>,
     ID: Clone + Hash + Eq,
 {
-    let multi_graph_edges = extract_connectivity(edge_intersection, polygons, polygon_semantics);
+    let multi_graph_edges =
+        extract_connectivity(edge_intersection, polygon_edges, polygon_semantics);
 
     let mut graph: HashMap<ID, HashSet<ID>> = Default::default();
     // Insert graph edges.

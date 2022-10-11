@@ -23,10 +23,14 @@ mod booleanop {
         let p2 = p0.translate((0., 100.).into()); // Far away, not touching anything.
 
         let polygons = vec![p0, p1, p2];
+        let polygon_edges = polygons
+            .iter()
+            .enumerate()
+            .flat_map(|(id, polygon)| polygon.all_edges_iter().map(move |e| (e, id)));
 
         let connectivity_graph = extract_connectivity_graph(
             edge_intersection_float,
-            polygons.iter().enumerate(),
+            polygon_edges,
             PolygonSemantics::Union,
         );
 
@@ -44,10 +48,14 @@ mod booleanop {
         let p1 = p0.translate((0., 2.).into());
 
         let polygons = vec![p0, p1];
+        let polygon_edges = polygons
+            .iter()
+            .enumerate()
+            .flat_map(|(id, polygon)| polygon.all_edges_iter().map(move |e| (e, id)));
 
         let connectivity_graph = extract_connectivity_graph(
             edge_intersection_float,
-            polygons.iter().enumerate(),
+            polygon_edges,
             PolygonSemantics::Union,
         );
 
@@ -61,10 +69,14 @@ mod booleanop {
         let p1 = p0.translate((2., 2.).into());
 
         let polygons = vec![p0, p1];
+        let polygon_edges = polygons
+            .iter()
+            .enumerate()
+            .flat_map(|(id, polygon)| polygon.all_edges_iter().map(move |e| (e, id)));
 
         let connectivity_graph = extract_connectivity_graph(
             edge_intersection_float,
-            polygons.iter().enumerate(),
+            polygon_edges,
             PolygonSemantics::Union,
         );
 
