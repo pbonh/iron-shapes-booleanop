@@ -23,6 +23,8 @@ mod booleanop {
         let p2 = p0.translate((0., 100.).into()); // Far away, not touching anything.
 
         let polygons = vec![p0, p1, p2];
+
+        // Convert the polygons into edges labelled with an identifier of their polygon.
         let polygon_edges = polygons
             .iter()
             .enumerate()
